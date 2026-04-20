@@ -28,6 +28,7 @@ function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ licenseKey: license, machineId }),
+          cache: 'no-store'
         });
 
         if (!res.ok) throw new Error('Verification server error');
@@ -36,12 +37,15 @@ function App() {
         setHasLicense(data.valid === true);
       } catch (err) {
         console.error('License verification failed:', err);
-        // Fallback to false so the user can see the License screen instead of a blank page
         setHasLicense(false);
       }
     }
 
     verifySavedLicense();
+
+    // Check license every 1 minute
+    const interval = setInterval(verifySavedLicense, 1 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   if (hasLicense === null) return null;

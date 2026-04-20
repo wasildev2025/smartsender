@@ -64,18 +64,25 @@ export async function createLicense(formData: FormData) {
 
 
 export async function updateLicenseStatus(id: string, status: string) {
-  const supabase = await createAdminClient()
+  try {
+    const supabase = await createAdminClient()
 
-  const { error } = await supabase
-    .from('licenses')
-    .update({ status })
-    .eq('id', id)
+    const { error } = await supabase
+      .from('licenses')
+      .update({ status })
+      .eq('id', id)
 
-  if (error) {
-    console.error('Error updating license:', error)
+    if (error) {
+      console.error(`Error updating license ${id} to ${status}:`, error.message)
+      throw new Error(`Failed to update license: ${error.message}`)
+    }
+
+    revalidatePath('/admin')
+    return { success: true }
+  } catch (err: any) {
+    console.error('updateLicenseStatus catastrophic failure:', err)
+    return { success: false, error: err.message }
   }
-
-  revalidatePath('/admin')
 }
 
 export async function deleteLicense(id: string) {
@@ -93,7 +100,7 @@ export async function deleteLicense(id: string) {
   revalidatePath('/admin')
 }
 
-export async function resetMachineId(id: string) {
+export async function resetMachineIdAction(id: string) {
   const supabase = await createAdminClient()
 
   const { error } = await supabase

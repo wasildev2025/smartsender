@@ -1,10 +1,11 @@
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { Plus, Key, Users, Clock, ShieldCheck, LogOut, Trash2, Ban } from 'lucide-react'
-import { signOut, createLicense, deleteLicense, updateLicenseStatus } from './actions'
+import { signOut, createLicense, deleteLicense, updateLicenseStatus, resetMachineIdAction } from './actions'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
+  const adminSupabase = await createAdminClient()
 
   const {
     data: { user },
@@ -14,8 +15,8 @@ export default async function AdminDashboard() {
     redirect('/admin/login')
   }
 
-  // Fetch licenses
-  const { data: licenses, error } = await supabase
+  // Fetch licenses using Admin Client to bypass RLS and see revoked/expired ones
+  const { data: licenses, error } = await adminSupabase
     .from('licenses')
     .select('*')
     .order('created_at', { ascending: false })
@@ -117,12 +118,8 @@ export default async function AdminDashboard() {
                         <span className="text-xs font-mono text-zinc-500" title={license.machine_id}>
                           {license.machine_id.substring(0, 8)}...
                         </span>
-                        <form action={async () => { 
-                          'use server'; 
-                          const { resetMachineId } = await import('./actions');
-                          await resetMachineId(license.id); 
-                        }}>
-                          <button className="text-zinc-600 hover:text-yellow-500 transition-colors" title="Reset Hardware ID">
+                        <form action={resetMachineIdAction.bind(null, license.id)}>
+                          <button className="text-zinc-600 hover:text-yellow-500 transition-colors" title="Reset Hardware ID" type="submit">
                             <Clock size={14} />
                           </button>
                         </form>
@@ -137,20 +134,20 @@ export default async function AdminDashboard() {
                   <td className="px-8 py-5">
                     <div className="flex gap-4">
                       {license.status === 'active' ? (
-                        <form action={async () => { 'use server'; await updateLicenseStatus(license.id, 'revoked'); }}>
-                          <button className="text-zinc-500 hover:text-red-500 transition-colors" title="Revoke License">
+                        <form action={updateLicenseStatus.bind(null, license.id, 'revoked')}>
+                          <button className="text-zinc-500 hover:text-red-500 transition-colors" title="Revoke License" type="submit">
                             <Ban size={18} />
                           </button>
                         </form>
                       ) : (
-                        <form action={async () => { 'use server'; await updateLicenseStatus(license.id, 'active'); }}>
-                          <button className="text-zinc-500 hover:text-green-500 transition-colors" title="Activate License">
+                        <form action={updateLicenseStatus.bind(null, license.id, 'active')}>
+                          <button className="text-zinc-500 hover:text-green-500 transition-colors" title="Activate License" type="submit">
                             <ShieldCheck size={18} />
                           </button>
                         </form>
                       )}
-                      <form action={async () => { 'use server'; await deleteLicense(license.id); }}>
-                        <button className="text-zinc-500 hover:text-red-500 transition-colors" title="Delete License">
+                      <form action={deleteLicense.bind(null, license.id)}>
+                        <button className="text-zinc-500 hover:text-red-500 transition-colors" title="Delete License" type="submit">
                           <Trash2 size={18} />
                         </button>
                       </form>
