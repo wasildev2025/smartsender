@@ -23,14 +23,16 @@ function App() {
       }
 
       try {
+        const machineId = await window.ipcRenderer.invoke('get-machine-id');
         const res = await fetch('http://localhost:3000/api/license/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ licenseKey: license }),
+          body: JSON.stringify({ licenseKey: license, machineId }),
         });
         const data = await res.json();
         setHasLicense(data.valid === true);
       } catch (err) {
+
         // If server is down, we might want to allow offline access for a short period, 
         // but for now we'll be strict for security.
         setHasLicense(false);

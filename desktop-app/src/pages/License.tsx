@@ -14,11 +14,13 @@ export default function License({ onVerify }: { onVerify: (key: string) => void 
     setError('');
 
     try {
+      const machineId = await window.ipcRenderer.invoke('get-machine-id');
       const res = await fetch('http://localhost:3000/api/license/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey: key }),
+        body: JSON.stringify({ licenseKey: key, machineId }),
       });
+
 
       const data = await res.json();
 

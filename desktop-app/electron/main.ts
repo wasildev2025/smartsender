@@ -71,6 +71,12 @@ function createWindow() {
     return { success: true }
   })
 
+  ipcMain.handle('get-machine-id', async () => {
+    const { machineIdSync } = await import('node-machine-id')
+    return machineIdSync()
+  })
+
+
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())

@@ -1,25 +1,28 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAdminClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const { licenseKey } = await request.json();
+    const { licenseKey, machineId } = await request.json();
 
-    if (!licenseKey) {
+    if (!licenseKey || !machineId) {
       return NextResponse.json(
-        { valid: false, message: 'License key is required' },
+        { valid: false, message: 'License key and Machine ID are required' },
         { status: 400 }
       );
     }
 
+    // Use Admin client to handle binding and bypass RLS
+    const supabase = await createAdminClient();
+
     // Query the licenses table
-    const { data, error } = await supabase
+    const { data: license, error } = await supabase
       .from('licenses')
       .select('*')
       .eq('key', licenseKey)
       .single();
 
-    if (error || !data) {
+    if (error || !license) {
       return NextResponse.json(
         { valid: false, message: 'Invalid license key' },
         { status: 404 }
@@ -27,25 +30,60 @@ export async function POST(request: Request) {
     }
 
     // Check status
-    if (data.status !== 'active') {
+    if (license.status !== 'active') {
       return NextResponse.json(
-        { valid: false, message: `License is ${data.status}` },
+        { valid: false, message: `License is ${license.status}` },
         { status: 403 }
       );
     }
 
     // Check expiration
-    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    if (license.expires_at && new Date(license.expires_at) < new Date()) {
       return NextResponse.json(
         { valid: false, message: 'License has expired' },
         { status: 403 }
       );
     }
 
+    // --- MACHINE BINDING LOGIC ---
+    if (!license.machine_id) {
+      // First time use: Bind current machine ID
+      const { error: bindError } = await supabase
+        .from('licenses')
+        .update({ machine_id: machineId })
+        .eq('id', license.id);
+
+      if (bindError) {
+        console.error('HWID Bind Error:', bindError.message);
+        return NextResponse.json(
+          { valid: false, message: 'Failed to bind device to license' },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({
+        valid: true,
+        message: 'License activated and locked to this device.',
+        expires_at: license.expires_at
+      });
+    }
+
+    // Subsequent use: Validate machine ID
+    if (license.machine_id !== machineId) {
+      return NextResponse.json(
+        { 
+          valid: false, 
+          message: 'Device Mismatch: This license is locked to another computer.',
+          code: 'DEVICE_MISMATCH'
+        },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       valid: true,
-      message: 'License is valid',
-      expires_at: data.expires_at
+      message: 'License verified',
+      expires_at: license.expires_at
     });
 
   } catch (error: any) {
@@ -56,3 +94,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
