@@ -14,24 +14,14 @@ export default function License({ onVerify }: { onVerify: (key: string) => void 
     setError('');
 
     try {
-      const machineId = await window.ipcRenderer.invoke('get-machine-id');
-      const res = await fetch('http://127.0.0.1:3000/api/license/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey: key, machineId }),
-      });
-
-
-      const data = await res.json();
-
-      if (data.valid) {
-        localStorage.setItem('smartsender_license', key);
+      const res = await window.smartsender.license.activate(key);
+      if (res.valid) {
         onVerify(key);
       } else {
-        setError(data.message || 'Invalid license key');
+        setError(res.error || 'Invalid license key');
       }
-    } catch (err) {
-      setError('Could not connect to the verification server. Please ensure the backend is running.');
+    } catch (err: any) {
+      setError(err?.message || 'Could not reach the licensing service.');
     } finally {
       setLoading(false);
     }

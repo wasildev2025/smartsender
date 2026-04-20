@@ -3,7 +3,7 @@ import { Settings as SettingsIcon, LogOut, CheckCircle2, ShieldAlert, Key, Clock
 import { useLicense } from '../context/LicenseContext';
 
 export default function Settings() {
-  const { isLicensed, expiresAt, licenseKey, verifyLicense, logoutLicense } = useLicense();
+  const { isLicensed, expiresAt, verifyLicense, logoutLicense } = useLicense();
   const [newKey, setNewKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState('');
@@ -32,14 +32,14 @@ export default function Settings() {
 
   const handleWhatsAppLogout = async () => {
     if (confirm('Are you sure you want to log out of WhatsApp? You will need to scan the QR code again.')) {
-      await (window as any).ipcRenderer.invoke('wa-logout');
+      await window.smartsender.wa.logout();
       alert('Logged out successfully');
     }
   };
 
-  const handleRevokeLicense = () => {
+  const handleRevokeLicense = async () => {
     if (confirm('DANGER: This will remove your license from this device. You will need to enter the key again to use premium features. Continue?')) {
-      logoutLicense();
+      await logoutLicense();
     }
   };
 
@@ -79,7 +79,7 @@ export default function Settings() {
                       <CheckCircle2 size={18} /> Licensed & Active
                     </div>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      License Key: <span className="font-mono text-xs">{licenseKey?.substring(0, 4)}••••••••{licenseKey?.slice(-4)}</span>
+                      License active on this device
                     </p>
                   </div>
                   <div className="text-right">

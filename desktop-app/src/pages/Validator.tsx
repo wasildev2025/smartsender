@@ -27,7 +27,7 @@ export default function Validator() {
     for (let i = 0; i < lines.length; i++) {
       const number = lines[i];
       try {
-        const res = await window.ipcRenderer.invoke('wa-check-number', number);
+        const res = await window.smartsender.wa.checkNumber(number);
         setResults(prev => [...prev, { number, isWhatsApp: res.isRegistered }]);
       } catch (err) {
         setResults(prev => [...prev, { number, isWhatsApp: false }]);

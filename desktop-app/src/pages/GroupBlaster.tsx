@@ -78,7 +78,7 @@ export default function GroupBlaster() {
       // Step 1: Create Group with first few participants (WhatsApp requires at least 1)
       addLog('Phase 1: Creating new WhatsApp group...', 'info');
       const initialBatch = numbers.slice(0, 3);
-      const createRes = await window.ipcRenderer.invoke('wa-create-group', groupName, initialBatch);
+      const createRes = await window.smartsender.wa.createGroup(groupName, initialBatch);
       
       if (!createRes.success) {
         throw new Error(`Failed to create group: ${createRes.error}`);
@@ -102,7 +102,7 @@ export default function GroupBlaster() {
           const batch = remaining.slice(i, i + 5);
           addLog(`Adding batch of ${batch.length} numbers...`);
           
-          const addRes = await window.ipcRenderer.invoke('wa-add-participants', groupId, batch);
+          const addRes = await window.smartsender.wa.addParticipants(groupId, batch);
           if (addRes.success) {
             setProgress(prev => Math.min(prev + batch.length + 3, numbers.length));
           } else {
@@ -117,7 +117,7 @@ export default function GroupBlaster() {
 
       // Step 3: Send Marketing Message
       addLog('Phase 3: Sending marketing message to group...', 'info');
-      const sendRes = await window.ipcRenderer.invoke('wa-send-message', groupId, message);
+      const sendRes = await window.smartsender.wa.sendMessage(groupId, message);
       if (sendRes.success) {
         addLog('Message delivered successfully to the group!', 'success');
       } else {
@@ -128,7 +128,7 @@ export default function GroupBlaster() {
       if (autoCleanup && runningRef.current) {
         addLog('Phase 4: Auto-Cleanup (Removing participants)...', 'info');
         await sleep(3);
-        const cleanupRes = await window.ipcRenderer.invoke('wa-remove-participants', groupId, numbers);
+        const cleanupRes = await window.smartsender.wa.removeParticipants(groupId, numbers);
         if (cleanupRes.success) {
           addLog('All participants removed from group.', 'success');
         } else {
@@ -139,7 +139,7 @@ export default function GroupBlaster() {
       if (leaveAfterBlast && runningRef.current) {
         addLog('Final Phase: Leaving and deleting group...', 'info');
         await sleep(2);
-        await window.ipcRenderer.invoke('wa-leave-group', groupId);
+        await window.smartsender.wa.leaveGroup(groupId);
         addLog('Smart Sender has left the group.', 'info');
       }
 

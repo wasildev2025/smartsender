@@ -1,42 +1,54 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, Poll } = pkg;
 import qrcode from 'qrcode';
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
+import { mkdirSync } from 'node:fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const require = createRequire(import.meta.url);
+
+// Puppeteer's internal sandbox requires setuid on Linux; on Windows/macOS
+// we rely on Chromium's full sandbox (default: ON).
+const PUPPETEER_ARGS = [
+  '--disable-dev-shm-usage',
+  '--disable-accelerated-2d-canvas',
+  '--no-first-run',
+  '--no-zygote',
+  '--disable-gpu',
+];
+if (process.platform === 'linux') {
+  // Linux: keep --no-sandbox only if the host can't provide one.
+  PUPPETEER_ARGS.push('--no-sandbox', '--disable-setuid-sandbox');
+}
 
 export class WhatsAppService {
   private client: any; // Using any because official types are missing for this version
   private win: BrowserWindow | null;
   private currentStatus: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY' = 'DISCONNECTED';
   private currentQR: string = '';
+  private readonly sessionDir: string;
 
-  constructor(win: BrowserWindow) {
+  constructor(win: BrowserWindow, accountId: string = 'default') {
     this.win = win;
 
-    // Initialize WhatsApp Client with LocalAuth for session saving
+    // Store session data inside Electron userData so it (a) does not pollute CWD,
+    // (b) is scoped to the current OS user, and (c) is removed on app uninstall.
+    this.sessionDir = join(app.getPath('userData'), 'wa-sessions', accountId);
+    try { mkdirSync(this.sessionDir, { recursive: true }); } catch { /* ignore */ }
+
     this.client = new Client({
       authStrategy: new LocalAuth({
-        dataPath: './.smartsender_auth' // Saves session locally
+        clientId: accountId,
+        dataPath: this.sessionDir,
       }),
       puppeteer: {
-        // Use headless mode
         headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      }
+        args: PUPPETEER_ARGS,
+      },
     });
 
     this.setupListeners();
@@ -318,21 +330,29 @@ export class WhatsAppService {
     this.client.on('message', async (msg: any) => {
       if (this.autoResponderRules.length === 0) return;
       if (msg.from === 'status@broadcast') return;
+      // Reject group chats by default — replying in groups is a major ban trigger.
+      if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return;
+      // Never reply to our own outbound echoes.
+      if (msg.fromMe) return;
 
-      const bodyLower = msg.body.toLowerCase();
-      
+      const body: string = typeof msg.body === 'string' ? msg.body : '';
+      if (!body) return;
+      const bodyLower = body.toLowerCase();
+
       for (const rule of this.autoResponderRules) {
-        let match = false;
-        if (rule.matchType === 'exact' && bodyLower === rule.keyword.toLowerCase()) match = true;
-        if (rule.matchType === 'contains' && bodyLower.includes(rule.keyword.toLowerCase())) match = true;
+        const keyword = String(rule?.keyword ?? '').toLowerCase();
+        if (!keyword) continue;
+        const match = rule.matchType === 'exact'
+          ? bodyLower === keyword
+          : rule.matchType === 'contains' && bodyLower.includes(keyword);
 
         if (match) {
           try {
-            await msg.reply(rule.replyText);
+            await msg.reply(String(rule.replyText ?? ''));
           } catch (e) {
             console.error('AutoResponder error', e);
           }
-          break; // Stop after first match
+          break;
         }
       }
     });

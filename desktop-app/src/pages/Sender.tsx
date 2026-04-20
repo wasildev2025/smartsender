@@ -144,14 +144,14 @@ export default function Sender() {
       try {
         let result;
         if (isPollMode) {
-          result = await window.ipcRenderer.invoke('wa-send-poll', number, pollQuestion, pollOptions, false);
+          result = await window.smartsender.wa.sendPoll(number, pollQuestion, pollOptions, false);
         } else {
-          result = await window.ipcRenderer.invoke('wa-send-message', number, finalMessage);
+          result = await window.smartsender.wa.sendMessage(number, finalMessage);
         }
 
         if (result.success) {
           addLog('success', `Sent successfully to ${result.number}`);
-          await window.ipcRenderer.invoke('db-increment-sent', 1);
+          await window.smartsender.db.incrementSent(1);
         } else {
           addLog('error', `Failed to send to ${number}: ${result.error}`);
         }
@@ -176,7 +176,7 @@ export default function Sender() {
       setIsRunning(false);
 
       // Record to database
-      await window.ipcRenderer.invoke('db-record-campaign', {
+      await window.smartsender.db.recordCampaign({
         id: Math.random().toString(36).substring(7),
         name: campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`,
         status: 'Completed',
@@ -194,7 +194,7 @@ export default function Sender() {
 
     // Record partial progress to database if we had any progress
     if (progress > 0) {
-      await window.ipcRenderer.invoke('db-record-campaign', {
+      await window.smartsender.db.recordCampaign({
         id: Math.random().toString(36).substring(7),
         name: (campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`) + ' (Stopped)',
         status: 'Failed',

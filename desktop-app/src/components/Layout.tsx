@@ -41,21 +41,15 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    // Get initial status
-    window.ipcRenderer.invoke('wa-get-status').then((status: any) => {
-      if (status) setWaStatus(status);
+    window.smartsender.wa.getStatus().then(status => {
+      if (status) setWaStatus({ status: status.status, number: status.number ?? null });
     });
 
-    // Listen for updates
-    const removeListener = window.ipcRenderer.on('wa-status', (_event, status: any) => {
-      setWaStatus(status);
+    const unsubscribe = window.smartsender.wa.onStatus(status => {
+      setWaStatus({ status: status.status, number: status.number ?? null });
     });
 
-    return () => {
-      if (typeof removeListener === 'function') {
-        removeListener();
-      }
-    };
+    return unsubscribe;
   }, []);
 
   return (
