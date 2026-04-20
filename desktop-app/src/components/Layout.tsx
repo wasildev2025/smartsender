@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   Smartphone,
   Bot,
-  PieChart
+  PieChart,
+  Zap
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Auto Responder', href: '/auto-responder', icon: Bot },
   { name: 'Extract & Scrape', href: '/extractor', icon: Download },
   { name: 'Group Automation', href: '/groups', icon: Users },
+  { name: 'Group Blaster', href: '/group-blaster', icon: Zap },
   { name: 'Number Validator', href: '/validator', icon: ShieldCheck },
   { name: 'Accounts', href: '/accounts', icon: Smartphone },
   { name: 'Settings', href: '/settings', icon: Settings },

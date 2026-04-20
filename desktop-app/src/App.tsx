@@ -7,6 +7,7 @@ import Accounts from './pages/Accounts';
 import Sender from './pages/Sender';
 import Extractor from './pages/Extractor';
 import Groups from './pages/Groups';
+import GroupBlaster from './pages/GroupBlaster';
 import Validator from './pages/Validator';
 import AutoResponder from './pages/AutoResponder';
 import Settings from './pages/Settings';
@@ -63,6 +64,7 @@ function App() {
           <Route path="auto-responder" element={<AutoResponder />} />
           <Route path="extractor" element={<Extractor />} />
           <Route path="groups" element={<Groups />} />
+          <Route path="group-blaster" element={<GroupBlaster />} />
           <Route path="validator" element={<Validator />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="settings" element={<Settings />} />

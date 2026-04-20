@@ -197,7 +197,7 @@ export class WhatsAppService {
 
       // Format participant IDs
       const participantIds = participantNumbers.map(n => {
-        const formatted = n.replace(/\D/g, '');
+        const formatted = n.toString().replace(/\D/g, '');
         return formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
       });
 
@@ -206,6 +206,69 @@ export class WhatsAppService {
       return { success: true, result };
     } catch (error: any) {
       console.error('Failed to add participants:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  public async createGroup(name: string, participantNumbers: string[]) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+
+    try {
+      const participantIds = participantNumbers.map(n => {
+        const formatted = n.toString().replace(/\D/g, '');
+        return formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
+      });
+
+      const result = await this.client.createGroup(name, participantIds);
+      return { success: true, gid: result.id._serialized };
+    } catch (error: any) {
+      console.error('Failed to create group:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  public async removeParticipantsFromGroup(groupId: string, participantNumbers: string[]) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+
+    try {
+      const chat = await this.client.getChatById(groupId);
+      if (!chat.isGroup) {
+        throw new Error('Chat is not a group');
+      }
+
+      const participantIds = participantNumbers.map(n => {
+        const formatted = n.toString().replace(/\D/g, '');
+        return formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
+      });
+
+      const groupChat: any = chat;
+      await groupChat.removeParticipants(participantIds);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Failed to remove participants:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  public async leaveGroup(groupId: string) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+
+    try {
+      const chat = await this.client.getChatById(groupId);
+      if (!chat.isGroup) {
+        throw new Error('Chat is not a group');
+      }
+      const groupChat: any = chat;
+      await groupChat.leave();
+      return { success: true };
+    } catch (error: any) {
+      console.error('Failed to leave group:', error);
       return { success: false, error: error.message };
     }
   }

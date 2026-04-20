@@ -61,8 +61,20 @@ function createWindow() {
     return await waService?.joinGroup(inviteCode)
   })
 
-  ipcMain.handle('wa-add-participants', async (_event, groupId: string, participantNumbers: string[]) => {
-    return await waService?.addParticipantsToGroup(groupId, participantNumbers)
+  ipcMain.handle('wa-add-participants', (_event, groupId, numbers) => {
+    return waService?.addParticipantsToGroup(groupId, numbers)
+  })
+
+  ipcMain.handle('wa-create-group', (_event, name, numbers) => {
+    return waService?.createGroup(name, numbers)
+  })
+
+  ipcMain.handle('wa-remove-participants', (_event, groupId, numbers) => {
+    return waService?.removeParticipantsFromGroup(groupId, numbers)
+  })
+
+  ipcMain.handle('wa-leave-group', (_event, groupId) => {
+    return waService?.leaveGroup(groupId)
   })
 
   ipcMain.handle('wa-check-number', async (_event, number: string) => {
