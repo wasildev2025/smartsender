@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
+import { SendGovernor } from './rateLimiter';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,9 +32,12 @@ export class WhatsAppService {
   private currentStatus: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY' = 'DISCONNECTED';
   private currentQR: string = '';
   private readonly sessionDir: string;
+  private readonly accountId: string;
+  private readonly governor = new SendGovernor();
 
   constructor(win: BrowserWindow, accountId: string = 'default') {
     this.win = win;
+    this.accountId = accountId;
 
     // Store session data inside Electron userData so it (a) does not pollute CWD,
     // (b) is scoped to the current OS user, and (c) is removed on app uninstall.
@@ -116,15 +120,21 @@ export class WhatsAppService {
       throw new Error('WhatsApp Client is not ready');
     }
 
+    const decision = await this.governor.request(this.accountId);
+    if (!decision.allow) {
+      return { success: false, number, error: `rate_limited:${decision.reason}`, retryAfterMs: decision.retryAfterMs };
+    }
+
     try {
-      // Format number (strip non-digits, add @c.us if missing)
       const formattedNumber = number.toString().replace(/\D/g, '');
-      
       if (formattedNumber.length < 7) {
         return { success: false, number: formattedNumber, error: 'Invalid number format. Ensure country code is included (e.g., 12125551234)' };
       }
 
       const chatId = formattedNumber.endsWith('@c.us') ? formattedNumber : `${formattedNumber}@c.us`;
+
+      // Human-pattern jitter before the actual send.
+      await new Promise(r => setTimeout(r, decision.waitMs));
 
       if (attachmentPath) {
         const { MessageMedia } = require('whatsapp-web.js');
@@ -133,7 +143,7 @@ export class WhatsAppService {
       } else {
         await this.client.sendMessage(chatId, text);
       }
-      return { success: true, number: formattedNumber };
+      return { success: true, number: formattedNumber, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send message:', error);
       return { success: false, number, error: error.message };
@@ -304,16 +314,21 @@ export class WhatsAppService {
       throw new Error('WhatsApp Client is not ready');
     }
 
+    const decision = await this.governor.request(this.accountId);
+    if (!decision.allow) {
+      return { success: false, number, error: `rate_limited:${decision.reason}`, retryAfterMs: decision.retryAfterMs };
+    }
+
     try {
       const formatted = number.toString().replace(/\D/g, '');
       const chatId = formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
 
-      const poll = new Poll(question, options, { 
-        allowMultipleAnswers: allowMultiple 
-      } as any);
+      await new Promise(r => setTimeout(r, decision.waitMs));
+
+      const poll = new Poll(question, options, { allowMultipleAnswers: allowMultiple } as any);
       await this.client.sendMessage(chatId, poll);
-      
-      return { success: true, number: formatted };
+
+      return { success: true, number: formatted, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send poll:', error);
       return { success: false, number, error: error.message };

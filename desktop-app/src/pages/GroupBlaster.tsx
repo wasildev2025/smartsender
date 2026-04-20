@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Users, Play, Square, MessageSquare, AlertTriangle, Trash2, LogOut, Loader2, Lock } from 'lucide-react';
+import { Users, Play, Square, MessageSquare, AlertTriangle, Lock } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
@@ -17,8 +17,8 @@ export default function GroupBlaster() {
   const [participantNumbers, setParticipantNumbers] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [, setProgress] = useState(0);
+  const [, setTotal] = useState(0);
 
   // Settings
   const [delayAfterCreate, setDelayAfterCreate] = useState(5);
@@ -85,6 +85,7 @@ export default function GroupBlaster() {
       }
 
       const groupId = createRes.gid;
+      if (!groupId) throw new Error('Group created but no ID returned.');
       addLog(`Group created successfully (ID: ${groupId})`, 'success');
       
       addLog(`Waiting ${delayAfterCreate}s for group initialization...`, 'info');
