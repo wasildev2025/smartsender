@@ -81,6 +81,10 @@ function createWindow() {
     return await waService?.checkNumber(number)
   })
 
+  ipcMain.handle('wa-send-poll', (_event, number, question, options, allowMultiple) => {
+    return waService?.sendPoll(number, question, options, allowMultiple)
+  })
+
   ipcMain.handle('wa-set-auto-responder', async (_event, rules: any[]) => {
     waService?.setAutoResponderRules(rules)
     return { success: true }

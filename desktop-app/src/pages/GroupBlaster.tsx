@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
-import { Users, Play, Square, MessageSquare, AlertTriangle, Trash2, LogOut, Loader2 } from 'lucide-react';
+import { Users, Play, Square, MessageSquare, AlertTriangle, Trash2, LogOut, Loader2, Lock } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
+import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 
 interface LogEntry {
@@ -9,6 +11,7 @@ interface LogEntry {
 }
 
 export default function GroupBlaster() {
+  const { isLicensed } = useLicense();
   const [groupName, setGroupName] = useState('');
   const [message, setMessage] = useState('Welcome to our community, {Name}!');
   const [participantNumbers, setParticipantNumbers] = useState('');
@@ -259,14 +262,26 @@ export default function GroupBlaster() {
                </div>
             </div>
 
-            <div className="pt-6">
+            <div className="pt-6 space-y-4">
+              {!isLicensed && (
+                 <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl">
+                   <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
+                     <Lock size={14} /> Group Blaster is a Pro Feature
+                   </p>
+                   <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
+                     Activate License to Unlock Automation
+                   </Link>
+                 </div>
+              )}
+
               {!isRunning ? (
                 <button 
                   onClick={startAutomation}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2"
+                  disabled={!isLicensed}
+                  className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2"
                 >
                   <Play size={18} fill="currentColor" />
-                  Start Group Blaster
+                  {isLicensed ? 'Start Group Blaster' : 'License Required'}
                 </button>
               ) : (
                 <button 

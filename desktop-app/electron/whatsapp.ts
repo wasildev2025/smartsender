@@ -1,5 +1,5 @@
 import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, Poll } = pkg;
 import qrcode from 'qrcode';
 import { BrowserWindow } from 'electron';
 import { fileURLToPath } from 'node:url';
@@ -284,6 +284,27 @@ export class WhatsAppService {
       return { number: formatted, isRegistered };
     } catch (error: any) {
       return { number: formatted, isRegistered: false, error: error.message };
+    }
+  }
+
+  public async sendPoll(number: string, question: string, options: string[], allowMultiple: boolean = false) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+
+    try {
+      const formatted = number.toString().replace(/\D/g, '');
+      const chatId = formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
+
+      const poll = new Poll(question, options, { 
+        allowMultipleAnswers: allowMultiple 
+      } as any);
+      await this.client.sendMessage(chatId, poll);
+      
+      return { success: true, number: formatted };
+    } catch (error: any) {
+      console.error('Failed to send poll:', error);
+      return { success: false, number, error: error.message };
     }
   }
 

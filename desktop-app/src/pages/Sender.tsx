@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Square, FileText, Settings, Users, Upload, Tag } from 'lucide-react';
+import { Play, Pause, Square, Settings, Users, Upload, Tag, Trash2, MessageCircle, Lock } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
+import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 
 interface LogEntry {
@@ -14,19 +16,23 @@ interface ContactData {
 }
 
 export default function Sender() {
+  const { isLicensed } = useLicense();
   const [contacts, setContacts] = useState<ContactData[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [numberColumn, setNumberColumn] = useState<string>('');
   const [contactsRaw, setContactsRaw] = useState('');
   const [message, setMessage] = useState('Hello {Name}, this is a test message!');
-  
+
   // Delay Settings (in seconds)
   const [minDelay, setMinDelay] = useState(5);
   const [maxDelay, setMaxDelay] = useState(15);
-  
+
   // Campaign Settings
   const [campaignName, setCampaignName] = useState('');
-  
+  const [isPollMode, setIsPollMode] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('Would you like to learn more?');
+  const [pollOptions, setPollOptions] = useState(['Yes!', 'Maybe later']);
+
   // Execution State
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -75,14 +81,14 @@ export default function Sender() {
         const parsedHeaders = results.meta.fields || [];
         setHeaders(parsedHeaders);
         setContacts(results.data as ContactData[]);
-        
+
         // Try to guess the number column
-        const numCol = parsedHeaders.find(h => 
-          h.toLowerCase().includes('number') || 
-          h.toLowerCase().includes('phone') || 
+        const numCol = parsedHeaders.find(h =>
+          h.toLowerCase().includes('number') ||
+          h.toLowerCase().includes('phone') ||
           h.toLowerCase().includes('mobile')
         ) || parsedHeaders[0];
-        
+
         setNumberColumn(numCol);
         setTotal(results.data.length);
         addLog('info', `Imported ${results.data.length} contacts from CSV.`);
@@ -123,7 +129,7 @@ export default function Sender() {
 
       const contact = contacts[i];
       const number = contact[numberColumn || 'Number'] || Object.values(contact)[0];
-      
+
       // Dynamic Variable Replacement
       let finalMessage = message;
       Object.entries(contact).forEach(([key, value]) => {
@@ -136,7 +142,13 @@ export default function Sender() {
       addLog('info', `Sending to ${number}...`);
 
       try {
-        const result = await window.ipcRenderer.invoke('wa-send-message', number, finalMessage);
+        let result;
+        if (isPollMode) {
+          result = await window.ipcRenderer.invoke('wa-send-poll', number, pollQuestion, pollOptions, false);
+        } else {
+          result = await window.ipcRenderer.invoke('wa-send-message', number, finalMessage);
+        }
+
         if (result.success) {
           addLog('success', `Sent successfully to ${result.number}`);
           await window.ipcRenderer.invoke('db-increment-sent', 1);
@@ -209,35 +221,103 @@ export default function Sender() {
       {/* Left Column: Configuration */}
       <div className="lg:col-span-2 space-y-6 flex flex-col h-full">
         {/* Message Configuration */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <FileText className="text-green-500" size={20} />
-            Message Template
-          </h2>
-          <div className="space-y-4">
-            <textarea
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              className="w-full h-32 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none"
-              placeholder="Type your message here... Use tags like {Name}"
-              disabled={isRunning}
-            />
-            <div className="flex flex-wrap gap-2">
-              <span className="text-xs font-medium text-zinc-500 w-full mb-1 flex items-center gap-1">
-                <Tag size={12} /> Click to insert tags:
-              </span>
-              {(headers.length > 0 ? headers : ['Number', 'Name']).map(header => (
-                <button
-                  key={header}
-                  onClick={() => insertVariable(header)}
-                  disabled={isRunning}
-                  className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/40 transition text-sm font-medium"
-                >
-                  {`{${header}}`}
-                </button>
-              ))}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm min-h-[300px]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <MessageCircle className="text-green-500" size={20} />
+              Message Template
+            </h2>
+            <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+              <button
+                onClick={() => setIsPollMode(false)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition ${!isPollMode ? 'bg-white dark:bg-zinc-700 shadow-sm' : 'text-zinc-500'}`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => setIsPollMode(true)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition ${isPollMode ? 'bg-white dark:bg-zinc-700 shadow-sm' : 'text-zinc-500'}`}
+              >
+                Interactive
+              </button>
             </div>
           </div>
+
+          {!isPollMode ? (
+            <div className="space-y-4">
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                className="w-full h-32 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none text-sm"
+                placeholder="Type your message here... Use tags like {Name}"
+                disabled={isRunning}
+              />
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-medium text-zinc-500 w-full mb-1 flex items-center gap-1">
+                  <Tag size={12} /> Click to insert tags:
+                </span>
+                {(headers.length > 0 ? headers : ['Number', 'Name']).map(header => (
+                  <button
+                    key={header}
+                    onClick={() => insertVariable(header)}
+                    disabled={isRunning}
+                    className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-900/50 hover:bg-green-100 dark:hover:bg-green-900/40 transition text-sm font-medium"
+                  >
+                    {`{${header}}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] text-zinc-500 font-bold uppercase">Question (Poll Name)</label>
+                <input
+                  type="text"
+                  value={pollQuestion}
+                  onChange={e => setPollQuestion(e.target.value)}
+                  disabled={isRunning}
+                  placeholder="e.g. Would you like a free sample?"
+                  className="w-full mt-1 p-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded outline-none text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] text-zinc-500 font-bold uppercase">Options (Clickable Menus)</label>
+                {pollOptions.map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={e => {
+                        const newOpts = [...pollOptions];
+                        newOpts[i] = e.target.value;
+                        setPollOptions(newOpts);
+                      }}
+                      disabled={isRunning}
+                      placeholder={`Option ${i + 1}`}
+                      className="flex-1 p-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded outline-none text-xs"
+                    />
+                    <button
+                      onClick={() => setPollOptions(prev => prev.filter((_, idx) => idx !== i))}
+                      disabled={isRunning}
+                      className="p-2 text-zinc-400 hover:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                {pollOptions.length < 10 && (
+                  <button
+                    onClick={() => setPollOptions(prev => [...prev, ''])}
+                    disabled={isRunning}
+                    className="text-xs text-green-600 hover:underline"
+                  >
+                    + Add Option
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Contacts */}
@@ -270,7 +350,7 @@ export default function Sender() {
             <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg flex items-center justify-between">
               <div className="text-sm">
                 <span className="text-zinc-500">Phone Number Column: </span>
-                <select 
+                <select
                   value={numberColumn}
                   onChange={(e) => setNumberColumn(e.target.value)}
                   className="bg-transparent font-semibold text-green-600 outline-none"
@@ -279,7 +359,7 @@ export default function Sender() {
                   {headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
-              <button 
+              <button
                 onClick={() => { setHeaders([]); setContacts([]); setContactsRaw(''); }}
                 className="text-xs text-red-500 hover:underline"
                 disabled={isRunning}
@@ -356,10 +436,10 @@ export default function Sender() {
         {/* Execution Controls */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm flex-1 flex flex-col min-h-0">
           <h2 className="text-lg font-semibold mb-4">Execution</h2>
-          
+
           <div className="mb-4">
             <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Campaign Name (Optional)</label>
-            <input 
+            <input
               type="text"
               value={campaignName}
               onChange={(e) => setCampaignName(e.target.value)}
@@ -369,45 +449,59 @@ export default function Sender() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {!isRunning ? (
-              <button
-                onClick={startCampaign}
-                className="col-span-2 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-medium transition-colors shadow-sm shadow-green-500/20"
-              >
-                <Play size={18} fill="currentColor" />
-                Start Campaign
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={togglePause}
-                  className="flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-medium transition-colors"
-                >
-                  <Pause size={18} fill="currentColor" />
-                  {isPaused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  onClick={stopCampaign}
-                  className="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-medium transition-colors"
-                >
-                  <Square size={18} fill="currentColor" />
-                  Stop
-                </button>
-              </>
+          <div className="mt-auto space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            {!isLicensed && (
+               <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl mb-4">
+                 <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
+                   <Lock size={14} /> Bulk Sending is a Pro Feature
+                 </p>
+                 <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
+                   Activate License to Unlock
+                 </Link>
+               </div>
             )}
+
+            <div className="flex gap-3">
+              {!isRunning ? (
+                <button
+                  onClick={startCampaign}
+                  disabled={contacts.length === 0 || !isLicensed}
+                  className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white py-3 rounded-xl font-medium transition-colors"
+                >
+                  <Play size={18} />
+                  {isLicensed ? 'Start Campaign' : 'License Required'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={togglePause}
+                    className="flex-1 flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-medium transition-colors"
+                  >
+                    <Pause size={18} fill="currentColor" />
+                    {isPaused ? 'Resume' : 'Pause'}
+                  </button>
+                  <button
+                    onClick={stopCampaign}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-medium transition-colors"
+                  >
+                    <Square size={18} fill="currentColor" />
+                    Stop
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Progress */}
           {total > 0 && (
-            <div className="mb-6">
+            <div className="mt-6 mb-6">
               <div className="flex justify-between text-sm mb-2">
                 <span className="font-medium">Progress</span>
                 <span className="text-zinc-500 font-mono">{progress} / {total}</span>
               </div>
               <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-green-500 transition-all duration-300 rounded-full" 
+                <div
+                  className="h-full bg-green-500 transition-all duration-300 rounded-full"
                   style={{ width: `${(progress / total) * 100}%` }}
                 />
               </div>

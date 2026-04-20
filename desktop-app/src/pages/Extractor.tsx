@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Download, Users, MessageSquare, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, Users, MessageSquare, AlertCircle, RefreshCw, Lock } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
+import { Link } from 'react-router-dom';
 
 export default function Extractor() {
+  const { isLicensed } = useLicense();
   const [activeTab, setActiveTab] = useState<'groups' | 'chats'>('groups');
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -168,13 +171,24 @@ export default function Extractor() {
                       ))}
                     </select>
 
+                    {!isLicensed && (
+                       <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl">
+                         <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
+                           <Lock size={14} /> Group Extraction is a Pro Feature
+                         </p>
+                         <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
+                           Activate License to Unlock CSV Export
+                         </Link>
+                       </div>
+                    )}
+
                     <button
                       onClick={handleExtractGroupMembers}
-                      disabled={!selectedGroupId || extracting}
-                      className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium transition-colors"
+                      disabled={!selectedGroupId || extracting || !isLicensed}
+                      className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-medium transition-colors w-full sm:w-auto justify-center"
                     >
                       {extracting ? <RefreshCw className="animate-spin" size={18} /> : <Download size={18} />}
-                      Export to CSV
+                      {isLicensed ? 'Export to CSV' : 'License Required'}
                     </button>
                   </div>
                 )}
@@ -198,13 +212,24 @@ export default function Extractor() {
                     <div className="text-sm font-medium bg-zinc-100 dark:bg-zinc-800 px-4 py-2 rounded-lg">
                       {chats.length} Chats Found
                     </div>
+                    {!isLicensed && (
+                       <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl flex-1">
+                         <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
+                           <Lock size={14} /> Chat Extraction is a Pro Feature
+                         </p>
+                         <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
+                           Activate License to Unlock
+                         </Link>
+                       </div>
+                    )}
+
                     <button
                       onClick={handleExtractChats}
-                      disabled={chats.length === 0}
-                      className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 px-6 rounded-lg font-medium transition-colors"
+                      disabled={chats.length === 0 || !isLicensed}
+                      className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 px-6 rounded-lg font-medium transition-colors shrink-0"
                     >
                       <Download size={18} />
-                      Export All to CSV
+                      {isLicensed ? 'Export All to CSV' : 'License Required'}
                     </button>
                   </div>
                 )}

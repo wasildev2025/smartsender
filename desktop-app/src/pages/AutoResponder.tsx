@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Bot, Plus, Trash2, Save, CheckCircle2 } from 'lucide-react';
+import { Bot, Plus, Trash2, Save, CheckCircle2, Lock } from 'lucide-react';
+import { useLicense } from '../context/LicenseContext';
+import { Link } from 'react-router-dom';
 
 interface Rule {
   id: string;
@@ -9,6 +11,7 @@ interface Rule {
 }
 
 export default function AutoResponder() {
+  const { isLicensed } = useLicense();
   const [rules, setRules] = useState<Rule[]>([]);
   const [saved, setSaved] = useState(false);
 
@@ -50,13 +53,23 @@ export default function AutoResponder() {
             </p>
           </div>
           
-          <button
-            onClick={saveRules}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition-colors"
-          >
-            {saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
-            {saved ? 'Saved!' : 'Save Rules'}
-          </button>
+          {!isLicensed ? (
+            <div className="flex flex-col items-end gap-2">
+               <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 px-4 py-2 rounded-lg">
+                  <Lock size={14} className="text-amber-600" />
+                  <span className="text-xs text-amber-600 font-bold uppercase tracking-wider">Pro Only</span>
+               </div>
+               <Link to="/settings" className="text-[10px] text-amber-500 underline">Activate to Save</Link>
+            </div>
+          ) : (
+            <button
+              onClick={saveRules}
+              className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white py-2 px-6 rounded-lg font-medium transition-colors"
+            >
+              {saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
+              {saved ? 'Saved!' : 'Save Rules'}
+            </button>
+          )}
         </div>
 
         <div className="space-y-4 mb-6">

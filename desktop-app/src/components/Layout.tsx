@@ -9,10 +9,12 @@ import {
   Smartphone,
   Bot,
   PieChart,
-  Zap
+  Zap,
+  Lock
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useLicense } from '../context/LicenseContext';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -31,6 +33,7 @@ const navigation = [
 ];
 
 export default function Layout() {
+  const { isLicensed } = useLicense();
   const location = useLocation();
   const [waStatus, setWaStatus] = useState<{ status: string, number: string | null }>({
     status: 'DISCONNECTED',
@@ -59,13 +62,18 @@ export default function Layout() {
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 overflow-hidden text-zinc-900 dark:text-zinc-100">
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="h-16 flex items-center px-6 border-b border-zinc-200 dark:border-zinc-800 justify-between">
           <div className="flex items-center gap-2 font-bold text-lg tracking-tight">
             <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center text-white">
               <MessageSquare size={18} />
             </div>
             Smart Sender
           </div>
+          {!isLicensed && (
+            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-200 dark:border-amber-900/50">
+              Trial
+            </div>
+          )}
         </div>
         
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
@@ -90,12 +98,19 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-              License Active
-            </span>
-          </div>
+            {isLicensed ? (
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                 <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                   License Active
+                 </span>
+               </div>
+            ) : (
+                <Link to="/settings" className="flex items-center gap-2 text-amber-600 hover:underline">
+                  <Lock size={14} />
+                  <span className="text-xs font-bold uppercase tracking-wider">Activate Pro</span>
+                </Link>
+            )}
         </div>
       </div>
 
