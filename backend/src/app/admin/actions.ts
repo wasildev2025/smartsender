@@ -78,10 +78,8 @@ export async function updateLicenseStatus(id: string, status: string) {
     }
 
     revalidatePath('/admin')
-    return { success: true }
   } catch (err: any) {
     console.error('updateLicenseStatus catastrophic failure:', err)
-    return { success: false, error: err.message }
   }
 }
 

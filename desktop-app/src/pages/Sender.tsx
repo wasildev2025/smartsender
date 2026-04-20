@@ -43,10 +43,12 @@ export default function Sender() {
     if (!isRunning && !headers.length) {
       const lines = contactsRaw.split('\n').filter(l => l.trim());
       const newContacts = lines.map(line => {
-        const parts = line.split(',');
+        const parts = line.split(/[,|\t]/); // Split by comma, pipe, or tab
+        const number = parts[0]?.trim() || '';
+        const name = parts[1]?.trim() || '';
         return {
-          Number: parts[0]?.trim() || '',
-          Name: parts[1]?.trim() || 'Friend'
+          Number: number,
+          Name: name || 'Friend'
         };
       });
       setContacts(newContacts);
@@ -102,6 +104,7 @@ export default function Sender() {
     setProgress(0);
     setIsRunning(true);
     setIsPaused(false);
+    executionState.current = { running: true, paused: false };
     setLogs([]);
     addLog('info', `Starting campaign with ${contacts.length} contacts...`);
 
@@ -121,8 +124,10 @@ export default function Sender() {
       // Dynamic Variable Replacement
       let finalMessage = message;
       Object.entries(contact).forEach(([key, value]) => {
-        const regex = new RegExp(`{${key}}`, 'gi');
-        finalMessage = finalMessage.replace(regex, value);
+        // Escape key for use in regex
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`{${escapedKey}}`, 'gi');
+        finalMessage = finalMessage.replace(regex, value || '');
       });
 
       addLog('info', `Sending to ${number}...`);
@@ -159,10 +164,13 @@ export default function Sender() {
   const stopCampaign = () => {
     setIsRunning(false);
     setIsPaused(false);
+    executionState.current = { running: false, paused: false };
   };
 
   const togglePause = () => {
-    setIsPaused(!isPaused);
+    const newPausedState = !isPaused;
+    setIsPaused(newPausedState);
+    executionState.current.paused = newPausedState;
   };
 
   const insertVariable = (variable: string) => {

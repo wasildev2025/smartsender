@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { 
   MessageSquare, 
@@ -29,6 +30,28 @@ const navigation = [
 
 export default function Layout() {
   const location = useLocation();
+  const [waStatus, setWaStatus] = useState<{ status: string, number: string | null }>({
+    status: 'DISCONNECTED',
+    number: null
+  });
+
+  useEffect(() => {
+    // Get initial status
+    window.ipcRenderer.invoke('wa-get-status').then((status: any) => {
+      if (status) setWaStatus(status);
+    });
+
+    // Listen for updates
+    const removeListener = window.ipcRenderer.on('wa-status', (_event, status: any) => {
+      setWaStatus(status);
+    });
+
+    return () => {
+      if (typeof removeListener === 'function') {
+        removeListener();
+      }
+    };
+  }, []);
 
   return (
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 overflow-hidden text-zinc-900 dark:text-zinc-100">
@@ -82,7 +105,14 @@ export default function Layout() {
             {navigation.find(n => n.href === location.pathname)?.name || 'Dashboard'}
           </h1>
           <div className="flex items-center gap-4">
-            <div className="text-sm text-zinc-500">Connected: +1 234 567 890</div>
+            <div className={cn(
+              "text-sm font-medium",
+              (waStatus.status === 'READY' || waStatus.status === 'AUTHENTICATED') ? "text-green-600 dark:text-green-400" : "text-zinc-500"
+            )}>
+              {(waStatus.status === 'READY' || waStatus.status === 'AUTHENTICATED')
+                ? (waStatus.number ? `Connected: +${waStatus.number}` : 'Connected')
+                : 'No Connection'}
+            </div>
             <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden flex items-center justify-center">
               <Users size={16} />
             </div>

@@ -60,7 +60,8 @@ export class WhatsAppService {
       this.currentQR = '';
       this.notifyFrontend('wa-status', { 
         status: this.currentStatus, 
-        info: this.client.info 
+        number: this.client.info.wid.user,
+        info: this.client.info
       });
     });
 
@@ -89,12 +90,12 @@ export class WhatsAppService {
       console.error('Failed to initialize client', error);
     }
   }
-
   public getStatus() {
     return {
       status: this.currentStatus,
       qr: this.currentQR,
-      info: this.client.info
+      number: this.client?.info?.wid?.user || null,
+      info: this.client?.info || null
     };
   }
 
@@ -105,7 +106,12 @@ export class WhatsAppService {
 
     try {
       // Format number (strip non-digits, add @c.us if missing)
-      const formattedNumber = number.replace(/\D/g, '');
+      const formattedNumber = number.toString().replace(/\D/g, '');
+      
+      if (formattedNumber.length < 7) {
+        return { success: false, number: formattedNumber, error: 'Invalid number format. Ensure country code is included (e.g., 12125551234)' };
+      }
+
       const chatId = formattedNumber.endsWith('@c.us') ? formattedNumber : `${formattedNumber}@c.us`;
 
       if (attachmentPath) {
