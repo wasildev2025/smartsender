@@ -24,6 +24,9 @@ export default function Sender() {
   const [minDelay, setMinDelay] = useState(5);
   const [maxDelay, setMaxDelay] = useState(15);
   
+  // Campaign Settings
+  const [campaignName, setCampaignName] = useState('');
+  
   // Execution State
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -136,6 +139,7 @@ export default function Sender() {
         const result = await window.ipcRenderer.invoke('wa-send-message', number, finalMessage);
         if (result.success) {
           addLog('success', `Sent successfully to ${result.number}`);
+          await window.ipcRenderer.invoke('db-increment-sent', 1);
         } else {
           addLog('error', `Failed to send to ${number}: ${result.error}`);
         }
@@ -158,13 +162,35 @@ export default function Sender() {
     if (executionState.current.running) {
       addLog('success', 'Campaign finished successfully!');
       setIsRunning(false);
+
+      // Record to database
+      await window.ipcRenderer.invoke('db-record-campaign', {
+        id: Math.random().toString(36).substring(7),
+        name: campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`,
+        status: 'Completed',
+        sent: contacts.length,
+        total: contacts.length,
+        date: new Date().toLocaleDateString()
+      });
     }
   };
 
-  const stopCampaign = () => {
+  const stopCampaign = async () => {
     setIsRunning(false);
     setIsPaused(false);
     executionState.current = { running: false, paused: false };
+
+    // Record partial progress to database if we had any progress
+    if (progress > 0) {
+      await window.ipcRenderer.invoke('db-record-campaign', {
+        id: Math.random().toString(36).substring(7),
+        name: (campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`) + ' (Stopped)',
+        status: 'Failed',
+        sent: progress,
+        total: total,
+        date: new Date().toLocaleDateString()
+      });
+    }
   };
 
   const togglePause = () => {
@@ -331,6 +357,18 @@ export default function Sender() {
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm flex-1 flex flex-col min-h-0">
           <h2 className="text-lg font-semibold mb-4">Execution</h2>
           
+          <div className="mb-4">
+            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Campaign Name (Optional)</label>
+            <input 
+              type="text"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="e.g. Summer Sale 2026"
+              disabled={isRunning}
+              className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3 mb-6">
             {!isRunning ? (
               <button

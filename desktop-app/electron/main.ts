@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 import { WhatsAppService } from './whatsapp'
+import { StorageService } from './storage'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -21,6 +22,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? join(process.env.APP_ROOT, 'publ
 
 let win: BrowserWindow | null
 let waService: WhatsAppService | null = null
+let storage: StorageService | null = null
 
 function createWindow() {
   win = new BrowserWindow({
@@ -33,9 +35,10 @@ function createWindow() {
     },
   })
 
-  // Setup WhatsApp Service
+  // Setup Services
   waService = new WhatsAppService(win)
   waService.initialize()
+  storage = new StorageService()
 
   // IPC Handlers
   ipcMain.handle('wa-get-status', () => {
@@ -79,6 +82,19 @@ function createWindow() {
   ipcMain.handle('get-machine-id', async () => {
     const { machineIdSync } = await import('node-machine-id')
     return machineIdSync()
+  })
+
+  // Storage Handlers
+  ipcMain.handle('db-get-dashboard-data', async () => {
+    return await storage?.getDashboardData()
+  })
+
+  ipcMain.handle('db-record-campaign', async (_event, campaign: any) => {
+    return await storage?.recordCampaign(campaign)
+  })
+
+  ipcMain.handle('db-increment-sent', async (_event, amount: number) => {
+    return await storage?.incrementTotalSent(amount)
   })
 
 
