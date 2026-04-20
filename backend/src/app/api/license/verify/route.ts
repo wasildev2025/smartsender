@@ -1,14 +1,31 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/server';
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 export async function POST(request: Request) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   try {
     const { licenseKey, machineId } = await request.json();
 
     if (!licenseKey || !machineId) {
       return NextResponse.json(
         { valid: false, message: 'License key and Machine ID are required' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
@@ -25,7 +42,7 @@ export async function POST(request: Request) {
     if (error || !license) {
       return NextResponse.json(
         { valid: false, message: 'Invalid license key' },
-        { status: 404 }
+        { status: 404, headers }
       );
     }
 
@@ -33,7 +50,7 @@ export async function POST(request: Request) {
     if (license.status !== 'active') {
       return NextResponse.json(
         { valid: false, message: `License is ${license.status}` },
-        { status: 403 }
+        { status: 403, headers }
       );
     }
 
@@ -41,7 +58,7 @@ export async function POST(request: Request) {
     if (license.expires_at && new Date(license.expires_at) < new Date()) {
       return NextResponse.json(
         { valid: false, message: 'License has expired' },
-        { status: 403 }
+        { status: 403, headers }
       );
     }
 
@@ -57,7 +74,7 @@ export async function POST(request: Request) {
         console.error('HWID Bind Error:', bindError.message);
         return NextResponse.json(
           { valid: false, message: 'Failed to bind device to license' },
-          { status: 500 }
+          { status: 500, headers }
         );
       }
       
@@ -65,7 +82,7 @@ export async function POST(request: Request) {
         valid: true,
         message: 'License activated and locked to this device.',
         expires_at: license.expires_at
-      });
+      }, { headers });
     }
 
     // Subsequent use: Validate machine ID
@@ -76,7 +93,7 @@ export async function POST(request: Request) {
           message: 'Device Mismatch: This license is locked to another computer.',
           code: 'DEVICE_MISMATCH'
         },
-        { status: 403 }
+        { status: 403, headers }
       );
     }
 
@@ -84,13 +101,13 @@ export async function POST(request: Request) {
       valid: true,
       message: 'License verified',
       expires_at: license.expires_at
-    });
+    }, { headers });
 
   } catch (error: any) {
     console.error('License verification error:', error);
     return NextResponse.json(
       { valid: false, message: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }

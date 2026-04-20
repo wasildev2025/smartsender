@@ -24,7 +24,7 @@ function App() {
         }
 
         const machineId = await window.ipcRenderer.invoke('get-machine-id');
-        const res = await fetch('http://localhost:3000/api/license/verify', {
+        const res = await fetch('http://127.0.0.1:3000/api/license/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ licenseKey: license, machineId }),

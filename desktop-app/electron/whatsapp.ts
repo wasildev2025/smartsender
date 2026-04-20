@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 const require = createRequire(import.meta.url);
 
 export class WhatsAppService {
-  private client: Client;
+  private client: any; // Using any because official types are missing for this version
   private win: BrowserWindow | null;
   private currentStatus: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY' = 'DISCONNECTED';
   private currentQR: string = '';
@@ -44,7 +44,7 @@ export class WhatsAppService {
   }
 
   private setupListeners() {
-    this.client.on('qr', async (qr) => {
+    this.client.on('qr', async (qr: string) => {
       this.currentStatus = 'QR_READY';
       // Convert QR string to Base64 image
       try {
@@ -69,13 +69,13 @@ export class WhatsAppService {
       this.notifyFrontend('wa-status', { status: this.currentStatus });
     });
 
-    this.client.on('auth_failure', msg => {
+    this.client.on('auth_failure', (msg: string) => {
       console.error('AUTHENTICATION FAILURE', msg);
       this.currentStatus = 'DISCONNECTED';
       this.notifyFrontend('wa-status', { status: this.currentStatus, error: msg });
     });
 
-    this.client.on('disconnected', (reason) => {
+    this.client.on('disconnected', (reason: string) => {
       this.currentStatus = 'DISCONNECTED';
       this.notifyFrontend('wa-status', { status: this.currentStatus, reason });
     });
@@ -134,7 +134,7 @@ export class WhatsAppService {
       throw new Error('WhatsApp Client is not ready');
     }
     const chats = await this.client.getChats();
-    return chats.map(c => ({
+    return chats.map((c: any) => ({
       id: c.id._serialized,
       name: c.name || c.id.user,
       isGroup: c.isGroup,
@@ -225,7 +225,7 @@ export class WhatsAppService {
   }
 
   private setupAutoResponder() {
-    this.client.on('message', async (msg) => {
+    this.client.on('message', async (msg: any) => {
       if (this.autoResponderRules.length === 0) return;
       if (msg.from === 'status@broadcast') return;
 
