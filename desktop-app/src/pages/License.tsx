@@ -14,8 +14,6 @@ export default function License({ onVerify }: { onVerify: (key: string) => void 
     setError('');
 
     try {
-      // In a real app, this points to your Next.js backend
-      // For now we mock the API response
       const res = await fetch('http://localhost:3000/api/license/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -25,20 +23,13 @@ export default function License({ onVerify }: { onVerify: (key: string) => void 
       const data = await res.json();
 
       if (data.valid) {
-        // Save to local storage or main process
         localStorage.setItem('smartsender_license', key);
         onVerify(key);
       } else {
         setError(data.message || 'Invalid license key');
       }
     } catch (err) {
-      // Fallback for demo purposes when backend isn't running
-      if (key.startsWith('VALID_')) {
-        localStorage.setItem('smartsender_license', key);
-        onVerify(key);
-      } else {
-        setError('Connection error or invalid key. (Hint: Use VALID_123 for demo)');
-      }
+      setError('Could not connect to the verification server. Please ensure the backend is running.');
     } finally {
       setLoading(false);
     }

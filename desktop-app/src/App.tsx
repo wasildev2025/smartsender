@@ -15,13 +15,29 @@ function App() {
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check local storage for existing license
-    const license = localStorage.getItem('smartsender_license');
-    if (license) {
-      setHasLicense(true);
-    } else {
-      setHasLicense(false);
+    async function verifySavedLicense() {
+      const license = localStorage.getItem('smartsender_license');
+      if (!license) {
+        setHasLicense(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/license/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ licenseKey: license }),
+        });
+        const data = await res.json();
+        setHasLicense(data.valid === true);
+      } catch (err) {
+        // If server is down, we might want to allow offline access for a short period, 
+        // but for now we'll be strict for security.
+        setHasLicense(false);
+      }
     }
+
+    verifySavedLicense();
   }, []);
 
   if (hasLicense === null) return null;
