@@ -32,6 +32,7 @@ export class WhatsAppService {
     });
 
     this.setupListeners();
+    this.setupAutoResponder();
   }
 
   private setupListeners() {
@@ -118,6 +119,125 @@ export class WhatsAppService {
     this.currentStatus = 'DISCONNECTED';
     this.currentQR = '';
     this.notifyFrontend('wa-status', { status: this.currentStatus });
+  }
+
+  public async getChats() {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+    const chats = await this.client.getChats();
+    return chats.map(c => ({
+      id: c.id._serialized,
+      name: c.name || c.id.user,
+      isGroup: c.isGroup,
+      unreadCount: c.unreadCount
+    }));
+  }
+
+  public async getGroupMembers(groupId: string) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+    const chat = await this.client.getChatById(groupId);
+    if (!chat.isGroup) {
+      throw new Error('Chat is not a group');
+    }
+    
+    // Typecast to any to bypass type issues on the group chat object for participants
+    const groupChat: any = chat;
+    const participants = groupChat.participants || [];
+    
+    return participants.map((p: any) => ({
+      id: p.id._serialized,
+      number: p.id.user,
+      isAdmin: p.isAdmin || p.isSuperAdmin
+    }));
+  }
+
+  public async joinGroup(inviteCode: string) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+    
+    try {
+      // Extract the code if a full URL is provided
+      const code = inviteCode.replace('https://chat.whatsapp.com/', '').trim();
+      const response = await this.client.acceptInvite(code);
+      return { success: true, groupId: response };
+    } catch (error: any) {
+      console.error('Failed to join group:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  public async addParticipantsToGroup(groupId: string, participantNumbers: string[]) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+
+    try {
+      const chat = await this.client.getChatById(groupId);
+      if (!chat.isGroup) {
+        throw new Error('Chat is not a group');
+      }
+
+      // Format participant IDs
+      const participantIds = participantNumbers.map(n => {
+        const formatted = n.replace(/\D/g, '');
+        return formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
+      });
+
+      const groupChat: any = chat;
+      const result = await groupChat.addParticipants(participantIds);
+      return { success: true, result };
+    } catch (error: any) {
+      console.error('Failed to add participants:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  public async checkNumber(number: string) {
+    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
+      throw new Error('WhatsApp Client is not ready');
+    }
+    const formatted = number.replace(/\D/g, '');
+    const id = formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
+    try {
+      const isRegistered = await this.client.isRegisteredUser(id);
+      return { number: formatted, isRegistered };
+    } catch (error: any) {
+      return { number: formatted, isRegistered: false, error: error.message };
+    }
+  }
+
+  private autoResponderRules: any[] = [];
+
+  public setAutoResponderRules(rules: any[]) {
+    this.autoResponderRules = rules;
+  }
+
+  private setupAutoResponder() {
+    this.client.on('message', async (msg) => {
+      if (this.autoResponderRules.length === 0) return;
+      if (msg.from === 'status@broadcast') return;
+
+      const bodyLower = msg.body.toLowerCase();
+      
+      for (const rule of this.autoResponderRules) {
+        let match = false;
+        if (rule.matchType === 'exact' && bodyLower === rule.keyword.toLowerCase()) match = true;
+        if (rule.matchType === 'contains' && bodyLower.includes(rule.keyword.toLowerCase())) match = true;
+
+        if (match) {
+          try {
+            await msg.reply(rule.replyText);
+          } catch (e) {
+            console.error('AutoResponder error', e);
+          }
+          break; // Stop after first match
+        }
+      }
+    });
   }
 
   private notifyFrontend(channel: string, payload: any) {

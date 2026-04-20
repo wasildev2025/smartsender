@@ -4,6 +4,12 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import License from './pages/License';
 import Accounts from './pages/Accounts';
+import Sender from './pages/Sender';
+import Extractor from './pages/Extractor';
+import Groups from './pages/Groups';
+import Validator from './pages/Validator';
+import AutoResponder from './pages/AutoResponder';
+import Settings from './pages/Settings';
 
 function App() {
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
@@ -29,13 +35,13 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
-          <Route path="sender" element={<div className="p-4">Bulk Sender Coming Soon</div>} />
-          <Route path="auto-responder" element={<div className="p-4">Auto Responder Coming Soon</div>} />
-          <Route path="extractor" element={<div className="p-4">Extractor Coming Soon</div>} />
-          <Route path="groups" element={<div className="p-4">Groups Coming Soon</div>} />
-          <Route path="validator" element={<div className="p-4">Validator Coming Soon</div>} />
+          <Route path="sender" element={<Sender />} />
+          <Route path="auto-responder" element={<AutoResponder />} />
+          <Route path="extractor" element={<Extractor />} />
+          <Route path="groups" element={<Groups />} />
+          <Route path="validator" element={<Validator />} />
           <Route path="accounts" element={<Accounts />} />
-          <Route path="settings" element={<div className="p-4">Settings Coming Soon</div>} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

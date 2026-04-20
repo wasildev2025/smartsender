@@ -37,6 +37,35 @@ function createWindow() {
     return waService?.getStatus()
   })
 
+  ipcMain.handle('wa-send-message', async (_event, number: string, text: string, attachmentPath?: string) => {
+    return await waService?.sendMessage(number, text, attachmentPath)
+  })
+
+  ipcMain.handle('wa-get-chats', async () => {
+    return await waService?.getChats()
+  })
+
+  ipcMain.handle('wa-get-group-members', async (_event, groupId: string) => {
+    return await waService?.getGroupMembers(groupId)
+  })
+
+  ipcMain.handle('wa-join-group', async (_event, inviteCode: string) => {
+    return await waService?.joinGroup(inviteCode)
+  })
+
+  ipcMain.handle('wa-add-participants', async (_event, groupId: string, participantNumbers: string[]) => {
+    return await waService?.addParticipantsToGroup(groupId, participantNumbers)
+  })
+
+  ipcMain.handle('wa-check-number', async (_event, number: string) => {
+    return await waService?.checkNumber(number)
+  })
+
+  ipcMain.handle('wa-set-auto-responder', async (_event, rules: any[]) => {
+    waService?.setAutoResponderRules(rules)
+    return { success: true }
+  })
+
   ipcMain.handle('wa-logout', async () => {
     await waService?.logout()
     return { success: true }
