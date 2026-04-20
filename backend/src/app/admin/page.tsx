@@ -52,15 +52,36 @@ export default async function AdminDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="p-8 border-b border-zinc-800 flex justify-between items-center">
-          <h2 className="text-xl font-bold">Generated Licenses</h2>
-          <form action={createLicense}>
-            <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black px-6 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg shadow-green-500/20">
-              <Plus size={18} strokeWidth={3} />
-              Generate VIP Key
-            </button>
-          </form>
+        <div className="p-8 border-b border-zinc-800">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <h2 className="text-xl font-bold">New License / Management</h2>
+            
+            <form action={createLicense} className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <input
+                  name="key"
+                  type="text"
+                  placeholder="Custom Key (Optional)"
+                  className="bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-green-500 outline-none w-48 placeholder:text-zinc-700"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  name="days"
+                  type="number"
+                  placeholder="365"
+                  className="bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm focus:border-green-500 outline-none w-20 text-center placeholder:text-zinc-700"
+                />
+                <span className="text-xs text-zinc-600 font-bold uppercase tracking-tighter">Days</span>
+              </div>
+              <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 active:scale-95 text-black px-6 py-2 rounded-xl font-bold text-sm transition-all shadow-lg shadow-green-500/20">
+                <Plus size={16} strokeWidth={3} />
+                Create License
+              </button>
+            </form>
+          </div>
         </div>
+
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">

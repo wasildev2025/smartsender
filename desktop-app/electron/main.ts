@@ -8,6 +8,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = join(__dirname, '..')
 
+// Handle startup errors
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection at:', reason);
+});
+
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const MAIN_DIST = join(process.env.APP_ROOT, 'dist-electron')
 export const RENDERER_DIST = join(process.env.APP_ROOT, 'dist')
@@ -24,7 +29,7 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, 'preload.mjs'),
       nodeIntegration: true,
-      contextIsolation: false, 
+      contextIsolation: true, 
     },
   })
 

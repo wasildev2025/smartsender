@@ -31,11 +31,16 @@ export async function signOut() {
 export async function createLicense(formData: FormData) {
   const supabase = await createAdminClient()
   
-  // Format: VIP-XXXX-XXXX
-  const randomChars = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-  const key = `VIP-${randomChars()}-${randomChars()}`;
+  // Get custom key or generate one
+  let key = formData.get('key') as string;
+  if (!key || key.trim() === '') {
+    const randomChars = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+    key = `VIP-${randomChars()}-${randomChars()}`;
+  }
   
-  const days = parseInt(formData.get('days') as string) || 30;
+  // Get custom duration
+  const daysString = formData.get('days') as string;
+  const days = daysString ? parseInt(daysString) : 365; // Default to 1 year if not specified
   
   const expires_at = new Date();
   expires_at.setDate(expires_at.getDate() + days);
@@ -44,7 +49,7 @@ export async function createLicense(formData: FormData) {
     .from('licenses')
     .insert([
       { 
-        key, 
+        key: key.trim(), 
         status: 'active', 
         expires_at: expires_at.toISOString()
       }
@@ -56,6 +61,7 @@ export async function createLicense(formData: FormData) {
 
   revalidatePath('/admin')
 }
+
 
 export async function updateLicenseStatus(id: string, status: string) {
   const supabase = await createAdminClient()
