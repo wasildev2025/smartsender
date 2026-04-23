@@ -12,21 +12,21 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Initial fetch
-    window.ipcRenderer.invoke('wa-get-status').then((status: WAStatus) => {
-      if (status) setWaStatus(status);
+    window.smartsender.wa.getStatus().then(status => {
+      if (status) setWaStatus(status as WAStatus);
       setLoading(false);
     });
 
-    // Listen for updates
-    return window.ipcRenderer.on('wa-status', (_event: any, payload: WAStatus) => {
-      setWaStatus(prev => ({ ...prev, ...payload }));
+    const unsubscribe = window.smartsender.wa.onStatus(payload => {
+      setWaStatus(prev => ({ ...prev, ...(payload as WAStatus) }));
     });
+
+    return unsubscribe;
   }, []);
 
   const handleLogout = async () => {
     setLoading(true);
-    await window.ipcRenderer.invoke('wa-logout');
+    await window.smartsender.wa.logout();
     setLoading(false);
   };
 

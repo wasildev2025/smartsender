@@ -34,7 +34,7 @@ export default function AutoResponder() {
   };
 
   const saveRules = async () => {
-    await window.ipcRenderer.invoke('wa-set-auto-responder', rules);
+    await window.smartsender.wa.setAutoResponder(rules);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

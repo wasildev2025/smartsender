@@ -24,7 +24,7 @@ export default function Groups() {
   const fetchChats = async () => {
     setLoading(true);
     try {
-      const data = await window.ipcRenderer.invoke('wa-get-chats');
+      const data = await window.smartsender.wa.getChats();
       setChats(data.filter((c: any) => c.isGroup));
     } catch (err) {
       console.error(err);
@@ -46,7 +46,7 @@ export default function Groups() {
       setJoinLogs(prev => [...prev, { msg: `Attempting to join: ${link}`, isError: false }]);
       
       try {
-        const res = await window.ipcRenderer.invoke('wa-join-group', link);
+        const res = await window.smartsender.wa.joinGroup(link);
         if (res.success) {
           setJoinLogs(prev => [...prev, { msg: `Successfully joined group!`, isError: false }]);
         } else {
@@ -71,7 +71,7 @@ export default function Groups() {
     setAddLogs([{ msg: `Adding ${numbers.length} participants...`, isError: false }]);
 
     try {
-      const res = await window.ipcRenderer.invoke('wa-add-participants', selectedGroupId, numbers);
+      const res = await window.smartsender.wa.addParticipants(selectedGroupId, numbers);
       if (res.success) {
         setAddLogs(prev => [...prev, { msg: `Successfully added participants!`, isError: false }]);
       } else {

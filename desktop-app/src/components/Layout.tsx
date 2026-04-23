@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { 
-  MessageSquare, 
-  Users, 
-  Download, 
-  Settings, 
+import {
+  MessageSquare,
+  Users,
+  Download,
+  Settings,
   ShieldCheck,
   Smartphone,
   Bot,
@@ -41,15 +41,15 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    // Get initial status
-    window.ipcRenderer.invoke('wa-get-status').then((status: any) => {
-      if (status) setWaStatus(status);
+    window.smartsender.wa.getStatus().then(status => {
+      if (status) setWaStatus({ status: status.status, number: status.number ?? null });
     });
 
-    // Listen for updates
-    return window.ipcRenderer.on('wa-status', (_event, status: any) => {
-      setWaStatus(status);
+    const unsubscribe = window.smartsender.wa.onStatus(status => {
+      setWaStatus({ status: status.status, number: status.number ?? null });
     });
+
+    return unsubscribe;
   }, []);
 
   return (
@@ -69,7 +69,7 @@ export default function Layout() {
             </div>
           )}
         </div>
-        
+
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
@@ -79,8 +79,8 @@ export default function Layout() {
                 to={item.href}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  isActive 
-                    ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white' 
+                  isActive
+                    ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white'
                     : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-white'
                 )}
               >
@@ -92,19 +92,19 @@ export default function Layout() {
         </nav>
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-            {isLicensed ? (
-               <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                 <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                   License Active
-                 </span>
-               </div>
-            ) : (
-                <Link to="/settings" className="flex items-center gap-2 text-amber-600 hover:underline">
-                  <Lock size={14} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Activate Pro</span>
-                </Link>
-            )}
+          {isLicensed ? (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                License Active
+              </span>
+            </div>
+          ) : (
+            <Link to="/settings" className="flex items-center gap-2 text-amber-600 hover:underline">
+              <Lock size={14} />
+              <span className="text-xs font-bold uppercase tracking-wider">Activate Pro</span>
+            </Link>
+          )}
         </div>
       </div>
 

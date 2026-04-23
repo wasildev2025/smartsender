@@ -21,8 +21,8 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    window.ipcRenderer.invoke('db-get-dashboard-data').then((res: DashboardData) => {
-      if (res) setData(res);
+    window.smartsender.db.getDashboardData().then((res) => {
+      if (res) setData(res as unknown as DashboardData);
     });
   }, []);
 

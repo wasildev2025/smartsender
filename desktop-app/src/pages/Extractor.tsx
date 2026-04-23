@@ -21,7 +21,7 @@ export default function Extractor() {
     setLoading(true);
     setError('');
     try {
-      const data = await window.ipcRenderer.invoke('wa-get-chats');
+      const data = await window.smartsender.wa.getChats();
       setChats(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load chats. Make sure WhatsApp is connected.');
@@ -53,7 +53,7 @@ export default function Extractor() {
     setError('');
     
     try {
-      const members = await window.ipcRenderer.invoke('wa-get-group-members', selectedGroupId);
+      const members = await window.smartsender.wa.getGroupMembers(selectedGroupId);
       
       const groupInfo = chats.find(c => c.id === selectedGroupId);
       const groupName = groupInfo ? groupInfo.name : 'group';

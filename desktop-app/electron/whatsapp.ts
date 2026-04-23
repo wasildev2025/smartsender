@@ -1,42 +1,58 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, Poll } = pkg;
 import qrcode from 'qrcode';
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
+import { mkdirSync } from 'node:fs';
+import { SendGovernor } from './rateLimiter';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const require = createRequire(import.meta.url);
+
+// Puppeteer's internal sandbox requires setuid on Linux; on Windows/macOS
+// we rely on Chromium's full sandbox (default: ON).
+const PUPPETEER_ARGS = [
+  '--disable-dev-shm-usage',
+  '--disable-accelerated-2d-canvas',
+  '--no-first-run',
+  '--no-zygote',
+  '--disable-gpu',
+];
+if (process.platform === 'linux') {
+  // Linux: keep --no-sandbox only if the host can't provide one.
+  PUPPETEER_ARGS.push('--no-sandbox', '--disable-setuid-sandbox');
+}
 
 export class WhatsAppService {
   private client: any; // Using any because official types are missing for this version
   private win: BrowserWindow | null;
   private currentStatus: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY' = 'DISCONNECTED';
   private currentQR: string = '';
+  private readonly sessionDir: string;
+  private readonly accountId: string;
+  private readonly governor = new SendGovernor();
 
-  constructor(win: BrowserWindow) {
+  constructor(win: BrowserWindow, accountId: string = 'default') {
     this.win = win;
+    this.accountId = accountId;
 
-    // Initialize WhatsApp Client with LocalAuth for session saving
+    // Store session data inside Electron userData so it (a) does not pollute CWD,
+    // (b) is scoped to the current OS user, and (c) is removed on app uninstall.
+    this.sessionDir = join(app.getPath('userData'), 'wa-sessions', accountId);
+    try { mkdirSync(this.sessionDir, { recursive: true }); } catch { /* ignore */ }
+
     this.client = new Client({
       authStrategy: new LocalAuth({
-        dataPath: './.smartsender_auth' // Saves session locally
+        clientId: accountId,
+        dataPath: this.sessionDir,
       }),
       puppeteer: {
-        // Use headless mode
         headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      }
+        args: PUPPETEER_ARGS,
+      },
     });
 
     this.setupListeners();
@@ -104,15 +120,21 @@ export class WhatsAppService {
       throw new Error('WhatsApp Client is not ready');
     }
 
+    const decision = await this.governor.request(this.accountId);
+    if (!decision.allow) {
+      return { success: false, number, error: `rate_limited:${decision.reason}`, retryAfterMs: decision.retryAfterMs };
+    }
+
     try {
-      // Format number (strip non-digits, add @c.us if missing)
       const formattedNumber = number.toString().replace(/\D/g, '');
-      
       if (formattedNumber.length < 7) {
         return { success: false, number: formattedNumber, error: 'Invalid number format. Ensure country code is included (e.g., 12125551234)' };
       }
 
       const chatId = formattedNumber.endsWith('@c.us') ? formattedNumber : `${formattedNumber}@c.us`;
+
+      // Human-pattern jitter before the actual send.
+      await new Promise(r => setTimeout(r, decision.waitMs));
 
       if (attachmentPath) {
         const { MessageMedia } = require('whatsapp-web.js');
@@ -121,7 +143,7 @@ export class WhatsAppService {
       } else {
         await this.client.sendMessage(chatId, text);
       }
-      return { success: true, number: formattedNumber };
+      return { success: true, number: formattedNumber, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send message:', error);
       return { success: false, number, error: error.message };
@@ -292,16 +314,21 @@ export class WhatsAppService {
       throw new Error('WhatsApp Client is not ready');
     }
 
+    const decision = await this.governor.request(this.accountId);
+    if (!decision.allow) {
+      return { success: false, number, error: `rate_limited:${decision.reason}`, retryAfterMs: decision.retryAfterMs };
+    }
+
     try {
       const formatted = number.toString().replace(/\D/g, '');
       const chatId = formatted.endsWith('@c.us') ? formatted : `${formatted}@c.us`;
 
-      const poll = new Poll(question, options, { 
-        allowMultipleAnswers: allowMultiple 
-      } as any);
+      await new Promise(r => setTimeout(r, decision.waitMs));
+
+      const poll = new Poll(question, options, { allowMultipleAnswers: allowMultiple } as any);
       await this.client.sendMessage(chatId, poll);
-      
-      return { success: true, number: formatted };
+
+      return { success: true, number: formatted, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send poll:', error);
       return { success: false, number, error: error.message };
@@ -318,21 +345,29 @@ export class WhatsAppService {
     this.client.on('message', async (msg: any) => {
       if (this.autoResponderRules.length === 0) return;
       if (msg.from === 'status@broadcast') return;
+      // Reject group chats by default — replying in groups is a major ban trigger.
+      if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return;
+      // Never reply to our own outbound echoes.
+      if (msg.fromMe) return;
 
-      const bodyLower = msg.body.toLowerCase();
-      
+      const body: string = typeof msg.body === 'string' ? msg.body : '';
+      if (!body) return;
+      const bodyLower = body.toLowerCase();
+
       for (const rule of this.autoResponderRules) {
-        let match = false;
-        if (rule.matchType === 'exact' && bodyLower === rule.keyword.toLowerCase()) match = true;
-        if (rule.matchType === 'contains' && bodyLower.includes(rule.keyword.toLowerCase())) match = true;
+        const keyword = String(rule?.keyword ?? '').toLowerCase();
+        if (!keyword) continue;
+        const match = rule.matchType === 'exact'
+          ? bodyLower === keyword
+          : rule.matchType === 'contains' && bodyLower.includes(keyword);
 
         if (match) {
           try {
-            await msg.reply(rule.replyText);
+            await msg.reply(String(rule.replyText ?? ''));
           } catch (e) {
             console.error('AutoResponder error', e);
           }
-          break; // Stop after first match
+          break;
         }
       }
     });
