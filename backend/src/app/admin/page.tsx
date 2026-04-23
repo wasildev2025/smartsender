@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Key, Users, Clock, ShieldCheck, LogOut, Trash2, Ban, RefreshCcw, Copy } from 'lucide-react'
 import { signOut, deleteLicense, updateLicenseStatus, resetMachineIdAction } from './actions'
 import LicenseForm from './LicenseForm'
+import LicenseTable from './LicenseTable'
 import { revalidatePath } from 'next/cache'
 
 export default async function AdminDashboard() {
