@@ -1,114 +1,67 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/utils/supabase/server';
+import { z } from 'zod';
+import { signLicenseToken } from '@/lib/licenseSigning';
+import { lookupLicense } from '@/lib/licenseStore';
+import { rateLimit, ipFromRequest } from '@/lib/rateLimit';
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
-}
+const BodySchema = z.object({
+  licenseKey: z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9_\-]+$/),
+  hwid: z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9:_\-]+$/),
+});
 
 export async function POST(request: Request) {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-
   try {
-    const { licenseKey, machineId } = await request.json();
-
-    if (!licenseKey || !machineId) {
+    const ip = ipFromRequest(request);
+    const limited = rateLimit(`lic:${ip}`, 20, 0.2); // ~12 req/min burst to 20
+    if (!limited.ok) {
       return NextResponse.json(
-        { valid: false, message: 'License key and Machine ID are required' },
-        { status: 400, headers }
+        { valid: false, message: 'rate_limited' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(limited.retryAfterMs / 1000).toString() } },
       );
     }
 
-    // Use Admin client to handle binding and bypass RLS
-    const supabase = await createAdminClient();
-
-    // Query the licenses table
-    const { data: license, error } = await supabase
-      .from('licenses')
-      .select('*')
-      .eq('key', licenseKey)
-      .single();
-
-    if (error || !license) {
-      return NextResponse.json(
-        { valid: false, message: 'Invalid license key' },
-        { status: 404, headers }
-      );
+    const body = BodySchema.safeParse(await request.json().catch(() => ({})));
+    if (!body.success) {
+      return NextResponse.json({ valid: false, message: 'invalid_request' }, { status: 400 });
     }
 
-    // Check status
-    if (license.status !== 'active') {
-      return NextResponse.json(
-        { valid: false, message: `License is ${license.status}` },
-        { status: 403, headers }
-      );
+    const { licenseKey, hwid } = body.data;
+
+    // Per-key rate limit (credential stuffing mitigation).
+    const perKey = rateLimit(`lic-key:${licenseKey}`, 10, 0.05); // 3/min
+    if (!perKey.ok) {
+      return NextResponse.json({ valid: false, message: 'rate_limited' }, { status: 429 });
     }
 
-    // Check expiration
-    if (license.expires_at && new Date(license.expires_at) < new Date()) {
-      return NextResponse.json(
-        { valid: false, message: 'License has expired' },
-        { status: 403, headers }
-      );
+    const result = await lookupLicense(licenseKey, hwid);
+    if (!result.ok) {
+      return NextResponse.json({ valid: false, message: result.reason }, { status: 401 });
     }
 
-    // --- MACHINE BINDING LOGIC ---
-    if (!license.machine_id) {
-      // First time use: Bind current machine ID
-      const { error: bindError } = await supabase
-        .from('licenses')
-        .update({ machine_id: machineId })
-        .eq('id', license.id);
+    const row = result.row;
 
-      if (bindError) {
-        console.error('HWID Bind Error:', bindError.message);
-        return NextResponse.json(
-          { valid: false, message: 'Failed to bind device to license' },
-          { status: 500, headers }
-        );
-      }
-      
-      return NextResponse.json({
-        valid: true,
-        message: 'License activated and locked to this device.',
-        expires_at: license.expires_at
-      }, { headers });
+    if (row.boundHwids.length > 0 && !row.boundHwids.includes(hwid) && row.boundHwids.length >= row.seatLimit) {
+      return NextResponse.json({ valid: false, message: 'seat_limit_exceeded' }, { status: 403 });
     }
 
-    // Subsequent use: Validate machine ID
-    if (license.machine_id !== machineId) {
-      return NextResponse.json(
-        { 
-          valid: false, 
-          message: 'Device Mismatch: This license is locked to another computer.',
-          code: 'DEVICE_MISMATCH'
-        },
-        { status: 403, headers }
-      );
-    }
+    const token = await signLicenseToken({
+      sub: row.id,
+      licenseKey: licenseKey.slice(-4),
+      hwid,
+      features: row.features,
+      plan: row.plan,
+    });
 
     return NextResponse.json({
       valid: true,
-      message: 'License verified',
-      expires_at: license.expires_at
-    }, { headers });
-
-  } catch (error: any) {
-    console.error('License verification error:', error);
-    return NextResponse.json(
-      { valid: false, message: 'Internal server error' },
-      { status: 500, headers }
-    );
+      token,
+      serverTime: new Date().toISOString(),
+      expiresAt: row.expiresAt,
+      features: row.features,
+      plan: row.plan,
+    });
+  } catch (err) {
+    console.error('license/verify error', err);
+    return NextResponse.json({ valid: false, message: 'internal_error' }, { status: 500 });
   }
 }
-
