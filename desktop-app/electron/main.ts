@@ -22,7 +22,7 @@ export const RENDERER_DIST = join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-const API_ORIGIN = process.env.SS_API_URL ?? 'https://api.smartsender.app'
+const API_ORIGIN = process.env.SS_API_URL ?? 'https://smartsender.vercel.app'
 
 const CSP = [
   "default-src 'self'",

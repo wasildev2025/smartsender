@@ -26,7 +26,7 @@ const ALG = 'EdDSA'
 // Replace this placeholder with your deployment's public key before shipping.
 // The key is safe to commit: it only verifies, never signs.
 const LICENSE_PUBLIC_KEY_PEM = process.env.SS_LICENSE_PUBLIC_KEY_EMBED ?? `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAREPLACE_WITH_REAL_PUBLIC_KEY_BEFORE_SHIPPING_BUILD
+MCowBQYDK2VwAyEATNJphCxaR8S7gukdfvs0WNaCFndQswyq/Ld2ggtDuK4=
 -----END PUBLIC KEY-----`
 
 const OFFLINE_GRACE_MS = 14 * 24 * 60 * 60 * 1000
