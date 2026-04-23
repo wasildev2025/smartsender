@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useLicense } from '../context/LicenseContext';
+import { ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface CampaignRecord {
   id: string;
@@ -15,6 +17,7 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
+  const { isLicensed } = useLicense();
   const [data, setData] = useState<DashboardData>({
     totalSent: 0,
     history: []
@@ -46,9 +49,23 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-zinc-500">History in last 50 runs</p>
         </div>
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm">
-          <h3 className="text-zinc-500 text-sm font-medium">Status</h3>
-          <div className="mt-2 text-3xl font-bold text-zinc-900 dark:text-white">Active</div>
-          <p className="mt-1 text-sm text-green-600">All systems operating</p>
+          <h3 className="text-zinc-500 text-sm font-medium">Account Status</h3>
+          <div className="mt-2 text-3xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            {isLicensed ? (
+              <>
+                <ShieldCheck className="text-green-500" size={32} />
+                Pro
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="text-amber-500" size={32} />
+                Trial
+              </>
+            )}
+          </div>
+          <p className={`mt-1 text-sm ${isLicensed ? 'text-green-600' : 'text-amber-600'}`}>
+            {isLicensed ? 'Premium Features Active' : 'Limited Version'}
+          </p>
         </div>
       </div>
 

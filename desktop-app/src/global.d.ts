@@ -50,6 +50,7 @@ declare global {
         activate: (key: string) => Promise<LicenseStatus & { error?: string }>;
         status: () => Promise<LicenseStatus>;
         deactivate: () => Promise<{ success: boolean }>;
+        onUpdate: (cb: (s: LicenseStatus) => void) => Unsubscribe;
       };
       system: {
         getMachineId: () => Promise<string | null>;

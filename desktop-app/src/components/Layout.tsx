@@ -63,11 +63,14 @@ export default function Layout() {
             </div>
             Smart Sender
           </div>
-          {!isLicensed && (
-            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-200 dark:border-amber-900/50">
-              Trial
-            </div>
-          )}
+          <div className={cn(
+            "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border",
+            isLicensed 
+              ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/50"
+              : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50"
+          )}>
+            {isLicensed ? 'Pro' : 'Trial'}
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
@@ -93,11 +96,14 @@ export default function Layout() {
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
           {isLicensed ? (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                License Active
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
+                  Licensed
+                </span>
+              </div>
+              <ShieldCheck size={14} className="text-green-500" />
             </div>
           ) : (
             <Link to="/settings" className="flex items-center gap-2 text-amber-600 hover:underline">

@@ -88,11 +88,20 @@ export default function Settings() {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Expiration</p>
-                    <p className="flex items-center gap-1 text-sm font-semibold justify-end">
-                      <Clock size={14} /> {getTimeLeft()}
-                    </p>
+                  <div className="text-right flex flex-col items-end gap-2">
+                    <div>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Expiration</p>
+                      <p className="flex items-center gap-1 text-sm font-semibold justify-end">
+                        <Clock size={14} /> {getTimeLeft()}
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => verifyLicense()} 
+                      className="text-[10px] bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 px-2 py-1 rounded font-bold uppercase tracking-widest transition-colors flex items-center gap-1"
+                      title="Force sync with server"
+                    >
+                      <Clock size={10} /> Sync License
+                    </button>
                   </div>
                 </div>
                 <script dangerouslySetInnerHTML={{ __html: `
