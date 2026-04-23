@@ -157,23 +157,35 @@ export class LicenseManager {
       const expectedHwid = computeHwid()
       if (claims.hwid !== expectedHwid) return { valid: false, expiresAt: null, features: [] }
 
-      // Token still valid by exp claim: accept and attempt re-validation in background.
-      if (claims.exp * 1000 > Date.now()) {
-        this.current = claims
-        this.lastValidatedAt = record.lastValidatedAt
-        return this.status()
-      }
+      this.current = claims
+      this.lastValidatedAt = record.lastValidatedAt
 
-      // Token expired but inside offline grace window.
-      if (Date.now() - record.lastValidatedAt < OFFLINE_GRACE_MS) {
-        this.current = claims
-        this.lastValidatedAt = record.lastValidatedAt
-        return this.status()
-      }
+      // If we're online, trigger a background sync to check for revocation
+      this.sync().catch(() => { /* offline or silent fail */ })
 
-      return { valid: false, expiresAt: record.expiresAt, features: [] }
+      return this.status()
     } catch {
       return { valid: false, expiresAt: null, features: [] }
+    }
+  }
+
+  /**
+   * Re-verify the license against the backend to check for revocation or updates.
+   */
+  async sync(): Promise<LicenseStatus> {
+    const record = await loadPersisted()
+    if (!record) return { valid: false, expiresAt: null, features: [] }
+
+    const token = decryptToken(record)
+    if (!token) return { valid: false, expiresAt: null, features: [] }
+
+    try {
+      const claims = await verifyToken(token)
+      // Re-activate using the full key if we have it in claims (which we do)
+      // This will hit the backend and update our local token/status.
+      return await this.activate(claims.licenseKey)
+    } catch {
+      return this.status()
     }
   }
 

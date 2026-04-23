@@ -136,12 +136,22 @@ export default function Extractor() {
 
         <div className="p-8">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg flex items-start gap-3 text-sm text-red-600 dark:text-red-400">
-              <AlertCircle size={20} className="shrink-0 mt-0.5" />
-              <div>
-                <strong className="block font-medium">Extraction Error</strong>
-                {error}
+            <div className="mb-6 p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <AlertCircle size={24} />
               </div>
+              <div>
+                <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100 mb-1">WhatsApp Not Connected</h3>
+                <p className="text-sm text-amber-700 dark:text-amber-400 max-w-md mx-auto">
+                  Please go to the <strong>Accounts</strong> tab and scan the QR code to connect your WhatsApp account before using extraction tools.
+                </p>
+              </div>
+              <Link 
+                to="/accounts" 
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-xl font-bold text-sm transition-all shadow-lg shadow-green-500/20"
+              >
+                Connect WhatsApp Now
+              </Link>
             </div>
           )}
 

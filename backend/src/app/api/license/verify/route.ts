@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     const token = await signLicenseToken({
       sub: row.id,
-      licenseKey: licenseKey.slice(-4),
+      licenseKey: licenseKey,
       hwid,
       features: row.features,
       plan: row.plan,
