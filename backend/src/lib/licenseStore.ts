@@ -34,9 +34,8 @@ export async function lookupLicense(key: string, hwid: string): Promise<LookupRe
   }
 
   // -- Development stub --
-  // Any key of shape SS-<8+ alnum>-<4+ alnum> is treated as a 30-day Pro license.
-  // Replace with real Supabase call before production.
-  if (!/^SS-[A-Z0-9]{8,}-[A-Z0-9]{4,}$/i.test(key)) {
+  // Supports SS-... or VIP-... formats.
+  if (!/^(SS|VIP)-[A-Z0-9]{4,}-[A-Z0-9]{4,}/i.test(key)) {
     return { ok: false, reason: 'not_found' };
   }
 
