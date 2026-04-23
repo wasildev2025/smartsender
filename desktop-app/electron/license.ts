@@ -37,6 +37,7 @@ export type LicenseClaims = {
   hwid: string
   features: string[]
   plan: string
+  licenseExp: string | null
   iat: number
   exp: number
 }
@@ -217,10 +218,12 @@ export class LicenseManager {
     if (!this.current) return { valid: false, expiresAt: null, features: [] }
     const now = Date.now()
     const expMs = this.current.exp * 1000
+    const displayExp = this.current.licenseExp || new Date(expMs).toISOString()
+    
     if (expMs > now) {
       return {
         valid: true,
-        expiresAt: new Date(expMs).toISOString(),
+        expiresAt: displayExp,
         features: this.current.features,
       }
     }
@@ -228,12 +231,12 @@ export class LicenseManager {
     if (graceRemaining > 0) {
       return {
         valid: true,
-        expiresAt: new Date(expMs).toISOString(),
+        expiresAt: displayExp,
         features: this.current.features,
         offlineGraceRemainingMs: graceRemaining,
       }
     }
-    return { valid: false, expiresAt: new Date(expMs).toISOString(), features: [] }
+    return { valid: false, expiresAt: displayExp, features: [] }
   }
 
   hasFeature(feature: string): boolean {

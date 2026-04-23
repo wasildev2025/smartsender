@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       hwid,
       features: row.features,
       plan: row.plan,
+      licenseExp: row.expiresAt,
     });
 
     return NextResponse.json({

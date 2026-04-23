@@ -17,6 +17,7 @@ export type LicenseClaims = {
   hwid: string;             // bound device
   features: string[];
   plan: string;
+  licenseExp: string | null; // actual license expiration date
   // Standard fields (exp, iat, iss, aud) are added by SignJWT.
 };
 
