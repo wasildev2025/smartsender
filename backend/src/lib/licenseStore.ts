@@ -14,6 +14,8 @@
 //   and check the `devices` table to enforce hwid binding.
 // -----------------------------------------------------------------
 
+import { supabaseAdmin } from './supabase';
+
 export type LicenseRow = {
   id: string;
   plan: string;
@@ -25,7 +27,7 @@ export type LicenseRow = {
 
 export type LookupResult =
   | { ok: true; row: LicenseRow }
-  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' };
+  | { ok: false; reason: 'not_found' | 'revoked' | 'expired' | 'seat_limit_exceeded' };
 
 export async function lookupLicense(key: string, hwid: string): Promise<LookupResult> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,24 +35,55 @@ export async function lookupLicense(key: string, hwid: string): Promise<LookupRe
     throw new Error('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL not configured');
   }
 
-  // -- Development stub --
-  // Supports SS-... or VIP-... formats.
-  if (!/^(SS|VIP)-[A-Z0-9]{4,}-[A-Z0-9]{4,}/i.test(key)) {
+  // 1. Fetch the license from Supabase
+  const { data: license, error } = await supabaseAdmin
+    .from('licenses')
+    .select('*')
+    .eq('key', key)
+    .single();
+
+  if (error || !license) {
     return { ok: false, reason: 'not_found' };
   }
 
-  void hwid; // Real impl binds hwid on first activation and checks seatLimit.
+  // 2. Check Status
+  if (license.status !== 'active') {
+    return { ok: false, reason: 'revoked' };
+  }
 
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  // 3. Check Expiration
+  if (license.expires_at && new Date(license.expires_at) < new Date()) {
+    return { ok: false, reason: 'expired' };
+  }
+
+  // 4. Handle HWID Binding
+  // If machine_id is null, this is the first activation.
+  if (!license.machine_id) {
+    const { error: updateError } = await supabaseAdmin
+      .from('licenses')
+      .update({ machine_id: hwid })
+      .eq('id', license.id);
+
+    if (updateError) {
+      console.error('Failed to bind HWID:', updateError);
+      return { ok: false, reason: 'revoked' }; // Fallback
+    }
+  } 
+  // If machine_id is set, it MUST match the current hwid.
+  else if (license.machine_id !== hwid) {
+    return { ok: false, reason: 'revoked' }; // Or 'hwid_mismatch' if we wanted
+  }
+
+  // 5. Success
   return {
     ok: true,
     row: {
-      id: `dev-${key.slice(-4)}`,
-      plan: 'pro',
-      features: ['wa_send', 'wa_group_add', 'wa_extract', 'wa_validate', 'wa_auto_responder'],
-      expiresAt,
-      seatLimit: 1,
-      boundHwids: [hwid],
+      id: license.id,
+      plan: license.plan || 'pro',
+      features: license.features || ['wa_send', 'wa_group_add', 'wa_extract', 'wa_validate', 'wa_auto_responder'],
+      expiresAt: license.expires_at,
+      seatLimit: license.seat_limit || 1,
+      boundHwids: [license.machine_id || hwid],
     },
   };
 }
