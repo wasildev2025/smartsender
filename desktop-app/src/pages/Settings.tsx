@@ -78,17 +78,29 @@ export default function Settings() {
                     <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-bold mb-1">
                       <CheckCircle2 size={18} /> Licensed & Active
                     </div>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      License active on this device
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {expiresAt?.includes('TRIAL') ? 'Trial Version' : 'Professional License'}
+                      </p>
+                      <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
+                        <span className="uppercase tracking-widest text-zinc-500 font-bold">Hardware ID:</span>
+                        <span id="hwid-display">Loading...</span>
+                      </div>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Expiration</p>
-                    <p className="flex items-center gap-1 text-sm font-semibold">
+                    <p className="flex items-center gap-1 text-sm font-semibold justify-end">
                       <Clock size={14} /> {getTimeLeft()}
                     </p>
                   </div>
                 </div>
+                <script dangerouslySetInnerHTML={{ __html: `
+                  window.smartsender.getMachineId().then(id => {
+                    const el = document.getElementById('hwid-display');
+                    if (el) el.innerText = id ? id.substring(0, 16) + '...' : 'Unknown';
+                  })
+                `}} />
               </div>
             ) : (
               <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl">

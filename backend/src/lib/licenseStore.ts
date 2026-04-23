@@ -31,10 +31,6 @@ export type LookupResult =
 
 export async function lookupLicense(key: string, hwid: string): Promise<LookupResult> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (process.env.NODE_ENV === 'production' && !supabaseUrl) {
-    throw new Error('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL not configured');
-  }
-
   // 1. Fetch the license from Supabase
   const { data: license, error } = await supabaseAdmin
     .from('licenses')
