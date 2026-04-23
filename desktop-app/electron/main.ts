@@ -25,12 +25,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? join(process.env.APP_ROOT, 'publ
 const API_ORIGIN = process.env.SS_API_URL ?? 'https://smartsender.vercel.app'
 
 const CSP = [
-  "default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
-  "script-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
-  "style-src * 'self' 'unsafe-inline' data: blob:",
-  "img-src * 'self' data: blob: https:",
-  "font-src * 'self' data: blob:",
-  "connect-src * 'self' data: blob: ws: wss:",
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  `connect-src 'self' ${API_ORIGIN} https://vdrbvlabtlhktwusaxfg.supabase.co wss://*.supabase.co`,
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -69,8 +69,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      webSecurity: false,
-      allowRunningInsecureContent: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
       experimentalFeatures: false,
       spellcheck: false,
     },
@@ -86,7 +86,6 @@ function createWindow() {
   })
 
   // Prevent navigation away from the app origin.
-  /*
   win.webContents.on('will-navigate', (e, url) => {
     try {
       const u = new URL(url)
@@ -98,7 +97,6 @@ function createWindow() {
       e.preventDefault()
     }
   })
-  */
 
   // Refuse webview creation entirely.
   win.webContents.on('will-attach-webview', (e) => e.preventDefault())
@@ -107,8 +105,6 @@ function createWindow() {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
     win.loadFile(join(RENDERER_DIST, 'index.html'))
-    // Temporarily open devtools in production to debug blank screen
-    win.webContents.openDevTools()
   }
 }
 
