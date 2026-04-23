@@ -19,15 +19,9 @@ export default function Accounts() {
     });
 
     // Listen for updates
-    const handleStatusUpdate = (_event: any, payload: WAStatus) => {
+    return window.ipcRenderer.on('wa-status', (_event: any, payload: WAStatus) => {
       setWaStatus(prev => ({ ...prev, ...payload }));
-    };
-
-    window.ipcRenderer.on('wa-status', handleStatusUpdate);
-
-    return () => {
-      window.ipcRenderer.off('wa-status', handleStatusUpdate);
-    };
+    });
   }, []);
 
   const handleLogout = async () => {

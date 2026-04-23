@@ -47,15 +47,9 @@ export default function Layout() {
     });
 
     // Listen for updates
-    const removeListener = window.ipcRenderer.on('wa-status', (_event, status: any) => {
+    return window.ipcRenderer.on('wa-status', (_event, status: any) => {
       setWaStatus(status);
     });
-
-    return () => {
-      if (typeof removeListener === 'function') {
-        removeListener();
-      }
-    };
   }, []);
 
   return (
