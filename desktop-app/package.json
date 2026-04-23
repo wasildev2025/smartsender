@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "release": "npm run build && electron-builder --win"
+    "release": "npm run build && electron-builder --win -c.npmRebuild=false"
   },
   "dependencies": {
     "bufferutil": "^4.1.0",
@@ -78,12 +78,13 @@
           ]
         }
       ],
-      "signingHashAlgorithms": [
-        "sha256"
-      ],
-      "signDlls": true,
-      "rfc3161TimeStampServer": "http://timestamp.digicert.com",
-      "publisherName": "Smart Sender"
+      "signtoolOptions": {
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com",
+        "publisherName": "Smart Sender"
+      }
     },
     "mac": {
       "hardenedRuntime": true,
