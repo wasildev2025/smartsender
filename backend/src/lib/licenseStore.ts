@@ -28,8 +28,9 @@ export type LookupResult =
   | { ok: false; reason: 'not_found' | 'revoked' | 'expired' };
 
 export async function lookupLicense(key: string, hwid: string): Promise<LookupResult> {
-  if (process.env.NODE_ENV === 'production' && !process.env.SUPABASE_URL) {
-    throw new Error('SUPABASE_URL not configured — refusing to serve licenses in production');
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (process.env.NODE_ENV === 'production' && !supabaseUrl) {
+    throw new Error('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL not configured');
   }
 
   // -- Development stub --
