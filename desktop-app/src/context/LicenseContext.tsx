@@ -52,9 +52,21 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     refreshFromMain();
-    // Re-check every 15 minutes; the main process can also extend offline grace.
+    
+    // Listen for real-time updates from main process (e.g. background sync revocation)
+    const unsub = window.smartsender.license.onUpdate((status: any) => {
+      setIsLicensed(status.valid);
+      setExpiresAt(status.expiresAt);
+      setFeatures(status.features);
+    });
+
+    // Re-check every 15 minutes as a fallback
     const interval = setInterval(refreshFromMain, 15 * 60 * 1000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [refreshFromMain]);
 
   return (

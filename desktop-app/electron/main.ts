@@ -239,4 +239,16 @@ app.whenReady().then(async () => {
   createWindow()
   initServices()
   registerIpc()
+
+  // Periodically sync license in the background (every hour)
+  setInterval(async () => {
+    const status = await licenseManager.sync()
+    if (win) win.webContents.send('license-updated', status)
+  }, 60 * 60 * 1000)
+  
+  // Initial sync shortly after start
+  setTimeout(async () => {
+    const status = await licenseManager.sync()
+    if (win) win.webContents.send('license-updated', status)
+  }, 5000)
 })

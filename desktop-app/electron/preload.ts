@@ -53,6 +53,7 @@ const api = {
     activate:             (key: string)                                                     => ipcRenderer.invoke('license-activate', key),
     status:               ()                                                                => ipcRenderer.invoke('license-status'),
     deactivate:           ()                                                                => ipcRenderer.invoke('license-deactivate'),
+    onUpdate:             (cb: (s: any) => void): Unsubscribe                               => on<any>('license-updated', cb),
   },
 
   system: {

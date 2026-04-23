@@ -46,6 +46,12 @@ export default function LicenseForm() {
               Trial (7 Days)
             </button>
             <button 
+              onClick={() => applyPreset(180, 'VIP')}
+              className="px-3 py-1.5 bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
+            >
+              Pro (6 Months)
+            </button>
+            <button 
               onClick={() => applyPreset(365, 'VIP')}
               className="px-3 py-1.5 bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
             >

@@ -181,10 +181,19 @@ export class LicenseManager {
 
     try {
       const claims = await verifyToken(token)
-      // Re-activate using the full key if we have it in claims (which we do)
-      // This will hit the backend and update our local token/status.
-      return await this.activate(claims.licenseKey)
-    } catch {
+      // Re-activate using the full key. This hits the backend.
+      const status = await this.activate(claims.licenseKey)
+      
+      // If the backend explicitly says it's invalid (not just a network error), 
+      // we must clear our local state to prevent "zombie" licenses.
+      if (!status.valid && status.error !== 'activation_failed' && !status.error?.startsWith('http_5')) {
+        console.log('[license] Backend sync reported invalid license. Revoking local entitlement.')
+        await this.deactivate()
+        return { valid: false, expiresAt: null, features: [] }
+      }
+      
+      return status
+    } catch (err) {
       return this.status()
     }
   }
