@@ -5,7 +5,7 @@ import { dirname } from 'node:path'
 import { WhatsAppService } from './whatsapp'
 import { StorageService } from './storage'
 import { Schemas, ensureAttachmentDir } from './ipc-schemas'
-import { LicenseManager } from './license'
+import { LicenseManager, guardAgainstPlaceholderKey } from './license'
 import { z, type ZodType } from 'zod'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -22,7 +22,10 @@ export const RENDERER_DIST = join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
-const API_ORIGIN = process.env.SS_API_URL ?? 'https://smartsender.vercel.app'
+// Injected by vite.config.ts at build time so packaged binaries don't depend
+// on runtime env vars. Override via SS_API_URL when running `npm run dev`.
+declare const __SS_API_URL__: string
+const API_ORIGIN = process.env.SS_API_URL ?? __SS_API_URL__
 
 const CSP = [
   "default-src 'self'",
@@ -217,6 +220,8 @@ function registerIpc() {
     ([campaign]) => storage?.recordCampaign(campaign as any))
   safeHandle('db-increment-sent', Schemas.IncrementSent,
     ([n]) => storage?.incrementTotalSent(n))
+  safeHandle('db-delete-campaign', Schemas.CampaignId,
+    ([id]) => storage?.deleteCampaign(id))
 }
 
 app.on('window-all-closed', () => {
@@ -233,6 +238,16 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(async () => {
+  // Refuse to start a packaged build that ships the dev placeholder key.
+  // Better to fail loudly here than to silently reject every license activation.
+  try {
+    guardAgainstPlaceholderKey()
+  } catch (err) {
+    console.error(err)
+    app.exit(1)
+    return
+  }
+
   ensureAttachmentDir()
   installSecurityHeaders()
   await licenseManager.load() // restore from disk before IPC is live

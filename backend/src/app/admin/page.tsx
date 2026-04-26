@@ -18,17 +18,47 @@ export default async function AdminDashboard() {
     redirect('/admin/login')
   }
 
-  // Fetch licenses using Admin Client to bypass RLS and see revoked/expired ones
-  const { data: licenses, error } = await adminSupabase
+  // Fetch licenses using Admin Client to bypass RLS and see revoked/expired ones.
+  const { data: licenseRows } = await adminSupabase
     .from('licenses')
     .select('*')
     .order('created_at', { ascending: false })
 
+  // Pull active device bindings in one round trip and stitch them onto each
+  // license so the table can show a hwid even on fresh DBs (where the legacy
+  // licenses.machine_id column doesn't exist).
+  const licenseIds = (licenseRows ?? []).map(l => l.id)
+  const { data: activeDevices } = licenseIds.length
+    ? await adminSupabase
+        .from('license_devices')
+        .select('id, license_id, hwid, last_seen')
+        .in('license_id', licenseIds)
+        .is('revoked_at', null)
+    : { data: [] as any[] }
+
+  const devicesByLicense = new Map<string, { id: string; hwid: string; last_seen: string }[]>()
+  for (const d of activeDevices ?? []) {
+    const arr = devicesByLicense.get(d.license_id) ?? []
+    arr.push({ id: d.id, hwid: d.hwid, last_seen: d.last_seen })
+    devicesByLicense.set(d.license_id, arr)
+  }
+
+  const licenses = (licenseRows ?? []).map(l => {
+    const devices = devicesByLicense.get(l.id) ?? []
+    return {
+      ...l,
+      // Surface the first active device for the existing UI; full list also
+      // available for richer admin views down the road.
+      machine_id: devices[0]?.hwid ?? l.machine_id ?? null,
+      active_devices: devices,
+    }
+  })
+
   const stats = {
-    total: licenses?.length || 0,
-    active: licenses?.filter(l => l.status === 'active').length || 0,
-    expired: licenses?.filter(l => l.status === 'expired').length || 0,
-    revoked: licenses?.filter(l => l.status === 'revoked').length || 0,
+    total: licenses.length,
+    active: licenses.filter(l => l.status === 'active').length,
+    expired: licenses.filter(l => l.status === 'expired').length,
+    revoked: licenses.filter(l => l.status === 'revoked').length,
   }
 
   const handleRefresh = async () => {

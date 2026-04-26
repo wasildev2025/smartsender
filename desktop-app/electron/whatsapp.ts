@@ -26,14 +26,18 @@ if (process.platform === 'linux') {
   PUPPETEER_ARGS.push('--no-sandbox', '--disable-setuid-sandbox');
 }
 
+type WaStatus = 'INITIALIZING' | 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY';
+
 export class WhatsAppService {
   private client: any; // Using any because official types are missing for this version
   private win: BrowserWindow | null;
-  private currentStatus: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY' = 'DISCONNECTED';
+  private currentStatus: WaStatus = 'INITIALIZING';
   private currentQR: string = '';
   private readonly sessionDir: string;
   private readonly accountId: string;
   private readonly governor = new SendGovernor();
+  private initWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private initAttempts = 0;
 
   constructor(win: BrowserWindow, accountId: string = 'default') {
     this.win = win;
@@ -44,24 +48,43 @@ export class WhatsAppService {
     this.sessionDir = join(app.getPath('userData'), 'wa-sessions', accountId);
     try { mkdirSync(this.sessionDir, { recursive: true }); } catch { /* ignore */ }
 
-    this.client = new Client({
-      authStrategy: new LocalAuth({
-        clientId: accountId,
-        dataPath: this.sessionDir,
-      }),
-      puppeteer: {
-        headless: true,
-        args: PUPPETEER_ARGS,
-      },
-    });
+    this.client = this.buildClient();
 
     this.setupListeners();
     this.setupAutoResponder();
   }
 
+  private buildClient() {
+    return new Client({
+      authStrategy: new LocalAuth({
+        clientId: this.accountId,
+        dataPath: this.sessionDir,
+      }),
+      puppeteer: {
+        headless: true,
+        args: PUPPETEER_ARGS,
+        // Give puppeteer more time to launch on slower machines.
+        timeout: 120_000,
+      },
+      // Pin a remote-cached WhatsApp Web version. Reduces variability in
+      // startup (and the occasional "stuck loading" caused by WA pushing
+      // breaking client changes that whatsapp-web.js hasn't caught up to).
+      webVersionCache: {
+        type: 'remote',
+        remotePath:
+          'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1023501197.html',
+      },
+      // Larger auth timeout helps on cold starts.
+      authTimeoutMs: 60_000,
+      qrMaxRetries: 3,
+      takeoverOnConflict: true,
+    } as any);
+  }
+
   private setupListeners() {
     this.client.on('qr', async (qr: string) => {
       this.currentStatus = 'QR_READY';
+      this.clearInitWatchdog();
       // Convert QR string to Base64 image
       try {
         this.currentQR = await qrcode.toDataURL(qr);
@@ -74,8 +97,9 @@ export class WhatsAppService {
     this.client.on('ready', () => {
       this.currentStatus = 'READY';
       this.currentQR = '';
-      this.notifyFrontend('wa-status', { 
-        status: this.currentStatus, 
+      this.clearInitWatchdog();
+      this.notifyFrontend('wa-status', {
+        status: this.currentStatus,
         number: this.client.info.wid.user,
         info: this.client.info
       });
@@ -83,27 +107,80 @@ export class WhatsAppService {
 
     this.client.on('authenticated', () => {
       this.currentStatus = 'AUTHENTICATED';
+      this.clearInitWatchdog();
       this.notifyFrontend('wa-status', { status: this.currentStatus });
     });
 
     this.client.on('auth_failure', (msg: string) => {
       console.error('AUTHENTICATION FAILURE', msg);
       this.currentStatus = 'DISCONNECTED';
+      this.clearInitWatchdog();
       this.notifyFrontend('wa-status', { status: this.currentStatus, error: msg });
     });
 
     this.client.on('disconnected', (reason: string) => {
       this.currentStatus = 'DISCONNECTED';
+      this.clearInitWatchdog();
       this.notifyFrontend('wa-status', { status: this.currentStatus, reason });
     });
   }
 
   public async initialize() {
-    console.log('Initializing WhatsApp Client...');
+    this.initAttempts += 1;
+    console.log(`Initializing WhatsApp Client (attempt ${this.initAttempts})...`);
+    this.currentStatus = 'INITIALIZING';
+    this.notifyFrontend('wa-status', { status: this.currentStatus });
+
+    // Watchdog: if no QR / ready event arrives within 90s, restart the
+    // client. whatsapp-web.js occasionally hangs forever on a blank
+    // Chromium page; auto-restarting recovers without user action.
+    if (this.initWatchdog) clearTimeout(this.initWatchdog);
+    this.initWatchdog = setTimeout(() => {
+      if (this.currentStatus === 'INITIALIZING' && this.initAttempts < 3) {
+        console.warn('WhatsApp engine init timed out, restarting...');
+        this.restart().catch(err => console.error('Restart failed', err));
+      } else if (this.currentStatus === 'INITIALIZING') {
+        this.currentStatus = 'DISCONNECTED';
+        this.notifyFrontend('wa-status', {
+          status: this.currentStatus,
+          error: 'Engine failed to start. Try restarting the app.',
+        });
+      }
+    }, 90_000);
+
     try {
       await this.client.initialize();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to initialize client', error);
+      this.currentStatus = 'DISCONNECTED';
+      this.notifyFrontend('wa-status', {
+        status: this.currentStatus,
+        error: error?.message || 'Engine failed to start',
+      });
+    }
+  }
+
+  private clearInitWatchdog() {
+    if (this.initWatchdog) {
+      clearTimeout(this.initWatchdog);
+      this.initWatchdog = null;
+    }
+    this.initAttempts = 0;
+  }
+
+  private async restart() {
+    try {
+      if (this.initWatchdog) {
+        clearTimeout(this.initWatchdog);
+        this.initWatchdog = null;
+      }
+      try { await this.client.destroy(); } catch { /* ignore */ }
+      this.client = this.buildClient();
+      this.setupListeners();
+      this.setupAutoResponder();
+      await this.initialize();
+    } catch (err) {
+      console.error('Failed to restart WA client', err);
     }
   }
   public getStatus() {
@@ -116,8 +193,10 @@ export class WhatsAppService {
   }
 
   public async sendMessage(number: string, text: string, attachmentPath?: string) {
-    if (this.currentStatus !== 'READY' && this.currentStatus !== 'AUTHENTICATED') {
-      throw new Error('WhatsApp Client is not ready');
+    if (this.currentStatus !== 'READY') {
+      // Refuse early if the WA web Store hasn't finished hydrating; sending
+      // before READY is what produces the cryptic "getChat of undefined" error.
+      return { success: false, number, error: 'WhatsApp is not fully ready yet. Wait a few seconds and try again.' };
     }
 
     const decision = await this.governor.request(this.accountId);
@@ -146,7 +225,12 @@ export class WhatsAppService {
       return { success: true, number: formattedNumber, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send message:', error);
-      return { success: false, number, error: error.message };
+      const raw = error?.message || String(error);
+      // Translate the most common confusing error into something actionable.
+      const friendly = /getChat|undefined.*reading/i.test(raw)
+        ? 'WhatsApp engine is not fully ready (Store not loaded). Reconnect from the Accounts tab.'
+        : raw;
+      return { success: false, number, error: friendly };
     }
   }
 

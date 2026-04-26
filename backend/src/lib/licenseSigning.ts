@@ -13,12 +13,13 @@ const AUDIENCE = 'smartsender-desktop';
 
 export type LicenseClaims = {
   sub: string;              // license row id
-  licenseKey: string;       // last 4 chars only, for UI hinting
-  hwid: string;             // bound device
+  licenseKey: string;       // license key, returned to desktop for re-sync
+  hwid: string;             // bound device hardware id
+  deviceId: string;         // license_devices.id — also the JWT jti
   features: string[];
   plan: string;
   licenseExp: string | null; // actual license expiration date
-  // Standard fields (exp, iat, iss, aud) are added by SignJWT.
+  // Standard fields (exp, iat, iss, aud, jti) are added by SignJWT.
 };
 
 let cachedPrivate: Awaited<ReturnType<typeof importPKCS8>> | null = null;
@@ -50,6 +51,7 @@ export async function signLicenseToken(
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setSubject(claims.sub)
+    .setJti(claims.deviceId)
     .setIssuedAt()
     .setExpirationTime(Math.floor(Date.now() / 1000) + ttlSeconds)
     .sign(key);

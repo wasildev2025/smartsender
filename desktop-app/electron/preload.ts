@@ -9,7 +9,7 @@ import { ipcRenderer, contextBridge } from 'electron'
 // ------------------------------------------------------------------
 
 type WaStatus = {
-  status: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY'
+  status: 'INITIALIZING' | 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY'
   qr?: string
   number?: string | null
   info?: unknown
@@ -47,6 +47,7 @@ const api = {
     getDashboardData:     ()                                                                => ipcRenderer.invoke('db-get-dashboard-data'),
     recordCampaign:       (c: unknown)                                                      => ipcRenderer.invoke('db-record-campaign', c),
     incrementSent:        (n: number)                                                       => ipcRenderer.invoke('db-increment-sent', n),
+    deleteCampaign:       (id: string)                                                      => ipcRenderer.invoke('db-delete-campaign', id),
   },
 
   license: {

@@ -117,6 +117,9 @@ export default function Sender() {
     setLogs([]);
     addLog('info', `Starting campaign with ${contacts.length} contacts...`);
 
+    let sentCount = 0;
+    let failedCount = 0;
+
     for (let i = 0; i < contacts.length; i++) {
       while (executionState.current.paused && executionState.current.running) {
         await sleep(500);
@@ -150,12 +153,15 @@ export default function Sender() {
         }
 
         if (result.success) {
+          sentCount += 1;
           addLog('success', `Sent successfully to ${result.number}`);
           await window.smartsender.db.incrementSent(1);
         } else {
+          failedCount += 1;
           addLog('error', `Failed to send to ${number}: ${result.error}`);
         }
       } catch (err: any) {
+        failedCount += 1;
         addLog('error', `Error sending to ${number}: ${err.message}`);
       }
 
@@ -172,15 +178,25 @@ export default function Sender() {
     }
 
     if (executionState.current.running) {
-      addLog('success', 'Campaign finished successfully!');
+      const allFailed = sentCount === 0 && failedCount > 0;
+      const someFailed = sentCount > 0 && failedCount > 0;
+
+      if (allFailed) {
+        addLog('error', `Campaign finished with errors. 0 sent, ${failedCount} failed.`);
+      } else if (someFailed) {
+        addLog('info', `Campaign finished. ${sentCount} sent, ${failedCount} failed.`);
+      } else {
+        addLog('success', `Campaign finished successfully! ${sentCount} sent.`);
+      }
+
       setIsRunning(false);
 
-      // Record to database
+      // Record campaign with the correct status based on actual outcomes.
       await window.smartsender.db.recordCampaign({
         id: Math.random().toString(36).substring(7),
         name: campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`,
-        status: 'Completed',
-        sent: contacts.length,
+        status: allFailed ? 'Failed' : 'Completed',
+        sent: sentCount,
         total: contacts.length,
         date: new Date().toLocaleDateString()
       });

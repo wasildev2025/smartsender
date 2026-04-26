@@ -35,19 +35,20 @@ export async function POST(request: Request) {
 
     const result = await lookupLicense(licenseKey, hwid);
     if (!result.ok) {
-      return NextResponse.json({ valid: false, message: result.reason }, { status: 401 });
+      const status =
+        result.reason === 'seat_limit_exceeded' ? 403 :
+        result.reason === 'internal_error' ? 500 :
+        401;
+      return NextResponse.json({ valid: false, message: result.reason }, { status });
     }
 
     const row = result.row;
 
-    if (row.boundHwids.length > 0 && !row.boundHwids.includes(hwid) && row.boundHwids.length >= row.seatLimit) {
-      return NextResponse.json({ valid: false, message: 'seat_limit_exceeded' }, { status: 403 });
-    }
-
     const token = await signLicenseToken({
       sub: row.id,
-      licenseKey: licenseKey,
+      licenseKey,
       hwid,
+      deviceId: result.deviceId,
       features: row.features,
       plan: row.plan,
       licenseExp: row.expiresAt,
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
       expiresAt: row.expiresAt,
       features: row.features,
       plan: row.plan,
+      deviceId: result.deviceId,
+      isNewDevice: result.isNewDevice,
     });
   } catch (err) {
     console.error('license/verify error', err);

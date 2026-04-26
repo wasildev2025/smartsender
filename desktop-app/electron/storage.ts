@@ -104,4 +104,17 @@ export class StorageService {
     this.data.totalSent += amount;
     await this.save();
   }
+
+  public async deleteCampaign(id: string) {
+    await this.ensureInitialized();
+    if (!this.data) return { success: false };
+
+    const before = this.data.history.length;
+    this.data.history = this.data.history.filter(h => h.id !== id);
+    if (this.data.history.length === before) {
+      return { success: false, error: 'campaign not found' };
+    }
+    await this.save();
+    return { success: true };
+  }
 }

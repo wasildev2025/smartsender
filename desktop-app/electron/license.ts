@@ -23,11 +23,21 @@ const ISSUER = 'smartsender.app'
 const AUDIENCE = 'smartsender-desktop'
 const ALG = 'EdDSA'
 
-// Replace this placeholder with your deployment's public key before shipping.
-// The key is safe to commit: it only verifies, never signs.
-const LICENSE_PUBLIC_KEY_PEM = process.env.SS_LICENSE_PUBLIC_KEY_EMBED ?? `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEATNJphCxaR8S7gukdfvs0WNaCFndQswyq/Ld2ggtDuK4=
------END PUBLIC KEY-----`
+// Public key is injected at build time by vite.config.ts (see __SS_LICENSE_PUBLIC_KEY__).
+// __SS_LICENSE_KEY_IS_PLACEHOLDER__ tells us whether the build used the dev fallback;
+// guardAgainstPlaceholder() refuses to run if so in a packaged binary.
+declare const __SS_LICENSE_PUBLIC_KEY__: string
+declare const __SS_LICENSE_KEY_IS_PLACEHOLDER__: boolean
+
+const LICENSE_PUBLIC_KEY_PEM = __SS_LICENSE_PUBLIC_KEY__
+
+export function guardAgainstPlaceholderKey() {
+  if (app.isPackaged && __SS_LICENSE_KEY_IS_PLACEHOLDER__) {
+    throw new Error(
+      'License public key is the development placeholder. Rebuild with SS_LICENSE_PUBLIC_KEY set.',
+    )
+  }
+}
 
 const OFFLINE_GRACE_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -35,11 +45,13 @@ export type LicenseClaims = {
   sub: string
   licenseKey: string
   hwid: string
+  deviceId: string         // = jti, set by backend at activation
   features: string[]
   plan: string
   licenseExp: string | null
   iat: number
   exp: number
+  jti?: string             // standard JWT claim mirroring deviceId
 }
 
 export type LicenseStatus = {
@@ -74,7 +86,15 @@ async function verifyToken(token: string): Promise<LicenseClaims> {
     audience: AUDIENCE,
     algorithms: [ALG],
   })
-  return payload as unknown as LicenseClaims
+  const claims = payload as unknown as LicenseClaims
+  // Legacy tokens (pre device-binding) lack deviceId. Treat them as invalid
+  // so the desktop re-activates and obtains a jti-bearing token.
+  const deviceId = claims.deviceId || claims.jti
+  if (!deviceId) {
+    throw new Error('legacy_token_missing_device_id')
+  }
+  claims.deviceId = deviceId
+  return claims
 }
 
 async function persist(token: string, claims: LicenseClaims) {
@@ -170,7 +190,24 @@ export class LicenseManager {
   }
 
   /**
-   * Re-verify the license against the backend to check for revocation or updates.
+   * Re-verify the license against the backend to detect revocation or updates.
+   *
+   * Decision matrix for what to do with the cached entitlement:
+   *
+   *   Outcome of activate()           → action
+   *   ------------------------------- → -----------------------------------
+   *   valid=true                      → refresh cache (handled by activate)
+   *   error: not_found / revoked /
+   *          expired / hwid_mismatch /
+   *          seat_limit_exceeded      → DEACTIVATE — backend says no
+   *   error: rate_limited             → keep cache, retry later
+   *   error: activation_failed (network/DNS/TLS)
+   *                                   → keep cache, fall back to grace
+   *   error: http_5xx                 → keep cache, fall back to grace
+   *   error: anything else            → keep cache (fail-safe)
+   *
+   * Anything more permissive lets a network outage masquerade as a revocation;
+   * anything stricter lets a backend bug brick paying users.
    */
   async sync(): Promise<LicenseStatus> {
     const record = await loadPersisted()
@@ -179,23 +216,28 @@ export class LicenseManager {
     const token = decryptToken(record)
     if (!token) return { valid: false, expiresAt: null, features: [] }
 
+    let claims: LicenseClaims
     try {
-      const claims = await verifyToken(token)
-      // Re-activate using the full key. This hits the backend.
-      const status = await this.activate(claims.licenseKey)
-      
-      // If the backend explicitly says it's invalid (not just a network error), 
-      // we must clear our local state to prevent "zombie" licenses.
-      if (!status.valid && status.error !== 'activation_failed' && !status.error?.startsWith('http_5')) {
-        console.log('[license] Backend sync reported invalid license. Revoking local entitlement.')
-        await this.deactivate()
-        return { valid: false, expiresAt: null, features: [] }
-      }
-      
-      return status
-    } catch (err) {
-      return this.status()
+      claims = await verifyToken(token)
+    } catch {
+      // Local token is malformed or signed by an unknown key. That's a hard
+      // invalid; deactivate.
+      await this.deactivate()
+      return { valid: false, expiresAt: null, features: [] }
     }
+
+    const status = await this.activate(claims.licenseKey)
+
+    if (status.valid) return status
+
+    if (isDefinitiveRejection(status.error)) {
+      console.log(`[license] Backend rejected license (${status.error}). Revoking local entitlement.`)
+      await this.deactivate()
+      return { valid: false, expiresAt: null, features: [] }
+    }
+
+    // Transient: keep the cached entitlement so the offline grace window applies.
+    return this.status()
   }
 
   async activate(licenseKey: string): Promise<LicenseStatus & { error?: string }> {
@@ -296,4 +338,27 @@ export class LicenseManager {
 
 async function safeJson(res: Response): Promise<any | null> {
   try { return await res.json() } catch { return null }
+}
+
+const DEFINITIVE_REJECTIONS = new Set([
+  'not_found',
+  'revoked',
+  'expired',
+  'hwid_mismatch',
+  'seat_limit_exceeded',
+  'invalid_request',
+])
+
+/**
+ * True only when the backend has unambiguously told us this entitlement is
+ * dead. Network errors, 5xx, and rate limits are all transient — we keep the
+ * cache and fall back to the offline grace window in those cases.
+ */
+function isDefinitiveRejection(err: string | undefined): boolean {
+  if (!err) return false
+  if (DEFINITIVE_REJECTIONS.has(err)) return true
+  // http_4xx other than 401/403 (which surface their canonical reason in the
+  // body and never reach this branch) are bugs in the request — also definitive.
+  if (/^http_4(0[02-9]|[1-9]\d)$/.test(err)) return true
+  return false
 }

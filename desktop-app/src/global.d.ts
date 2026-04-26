@@ -3,7 +3,7 @@ export {};
 type Unsubscribe = () => void;
 
 export type WaStatus = {
-  status: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY';
+  status: 'INITIALIZING' | 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY';
   qr?: string;
   number?: string | null;
   info?: unknown;
@@ -45,6 +45,7 @@ declare global {
         getDashboardData: () => Promise<{ totalSent: number; history: Array<{ id: string; name: string; status: string; sent: number; total: number; date: string }> }>;
         recordCampaign: (c: unknown) => Promise<void>;
         incrementSent: (n: number) => Promise<void>;
+        deleteCampaign: (id: string) => Promise<{ success: boolean; error?: string }>;
       };
       license: {
         activate: (key: string) => Promise<LicenseStatus & { error?: string }>;

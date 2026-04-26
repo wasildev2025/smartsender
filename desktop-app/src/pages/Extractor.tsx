@@ -9,12 +9,43 @@ export default function Extractor() {
   const [chats, setChats] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [waReady, setWaReady] = useState(false);
+  const [waStatus, setWaStatus] = useState<string>('INITIALIZING');
+
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
-    fetchChats();
+    let cancelled = false;
+
+    const tryFetch = async () => {
+      const status = await window.smartsender.wa.getStatus();
+      if (cancelled || !status) return;
+      setWaStatus(status.status);
+      if (status.status === 'READY') {
+        setWaReady(true);
+        fetchChats();
+      }
+    };
+    tryFetch();
+
+    const unsubscribe = window.smartsender.wa.onStatus(payload => {
+      if (cancelled) return;
+      setWaStatus(payload.status);
+      if (payload.status === 'READY') {
+        setWaReady(true);
+        // Refetch chats whenever WA transitions into READY.
+        fetchChats();
+      } else if (payload.status === 'DISCONNECTED') {
+        setWaReady(false);
+        setChats([]);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const fetchChats = async () => {
@@ -22,7 +53,7 @@ export default function Extractor() {
     setError('');
     try {
       const data = await window.smartsender.wa.getChats();
-      setChats(data);
+      setChats(data || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load chats. Make sure WhatsApp is connected.');
     } finally {
@@ -135,7 +166,19 @@ export default function Extractor() {
         </div>
 
         <div className="p-8">
-          {error && (
+          {!waReady && (waStatus === 'INITIALIZING' || waStatus === 'AUTHENTICATED') && (
+            <div className="mb-6 p-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-2xl flex flex-col items-center text-center gap-3">
+              <RefreshCw className="animate-spin text-blue-500" size={24} />
+              <div>
+                <h3 className="text-base font-bold text-blue-900 dark:text-blue-100 mb-1">WhatsApp engine warming up</h3>
+                <p className="text-sm text-blue-700 dark:text-blue-400 max-w-md mx-auto">
+                  Hang tight — we'll load your chats automatically once the engine is ready.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!waReady && (waStatus === 'DISCONNECTED' || waStatus === 'QR_READY') && (
             <div className="mb-6 p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex flex-col items-center text-center gap-4">
               <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
                 <AlertCircle size={24} />
@@ -146,12 +189,18 @@ export default function Extractor() {
                   Please go to the <strong>Accounts</strong> tab and scan the QR code to connect your WhatsApp account before using extraction tools.
                 </p>
               </div>
-              <Link 
-                to="/accounts" 
+              <Link
+                to="/accounts"
                 className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-xl font-bold text-sm transition-all shadow-lg shadow-green-500/20"
               >
                 Connect WhatsApp Now
               </Link>
+            </div>
+          )}
+
+          {waReady && error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl text-sm text-red-700 dark:text-red-400">
+              {error}
             </div>
           )}
 

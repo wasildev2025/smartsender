@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Smartphone, LogOut, RefreshCw, QrCode, ShieldCheck } from 'lucide-react';
 
 interface WAStatus {
-  status: 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY';
+  status: 'INITIALIZING' | 'DISCONNECTED' | 'QR_READY' | 'AUTHENTICATED' | 'READY';
   qr?: string;
   info?: any;
+  error?: string;
 }
 
 export default function Accounts() {
@@ -89,13 +90,23 @@ export default function Accounts() {
                 </div>
               )}
             </div>
+          ) : waStatus.status === 'INITIALIZING' ? (
+            <div className="flex flex-col items-center py-12">
+              <RefreshCw className="animate-spin text-green-500 mb-4" size={32} />
+              <h3 className="text-lg font-medium mb-2">Engine Starting</h3>
+              <p className="text-zinc-500 text-center max-w-sm">
+                Please wait while the WhatsApp engine initializes. This can take 30-60 seconds on the first run.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col items-center py-12">
               <div className="w-16 h-16 bg-zinc-200 dark:bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mb-4">
                 <QrCode size={32} />
               </div>
-              <h3 className="text-lg font-medium mb-2">Engine Starting</h3>
-              <p className="text-zinc-500 text-center">Please wait while the WhatsApp engine initializes...</p>
+              <h3 className="text-lg font-medium mb-2">Disconnected</h3>
+              <p className="text-zinc-500 text-center max-w-sm">
+                {waStatus.error || 'WhatsApp engine is not running. Restart the app to retry.'}
+              </p>
             </div>
           )}
         </div>

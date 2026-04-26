@@ -104,6 +104,8 @@ export const Schemas = {
 
   IncrementSent: z.tuple([z.number().int().min(0).max(10_000)]),
 
+  CampaignId: z.tuple([z.string().min(1).max(64)]),
+
   LicenseKey: z.tuple([
     z.string().trim().min(8).max(128).regex(/^[A-Za-z0-9_\-]+$/, 'invalid license key'),
   ]),

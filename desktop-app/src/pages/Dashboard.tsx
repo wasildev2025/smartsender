@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLicense } from '../context/LicenseContext';
-import { ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface CampaignRecord {
   id: string;
@@ -23,11 +23,25 @@ export default function Dashboard() {
     history: []
   });
 
-  useEffect(() => {
+  const refresh = () => {
     window.smartsender.db.getDashboardData().then((res) => {
       if (res) setData(res as unknown as DashboardData);
     });
+  };
+
+  useEffect(() => {
+    refresh();
   }, []);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Delete campaign "${name}"? This cannot be undone.`)) return;
+    const res = await window.smartsender.db.deleteCampaign(id);
+    if (res?.success) {
+      setData(prev => ({ ...prev, history: prev.history.filter(h => h.id !== id) }));
+    } else {
+      window.alert(res?.error || 'Failed to delete campaign.');
+    }
+  };
 
   const stats = {
     totalSent: data.totalSent.toLocaleString(),
@@ -81,12 +95,13 @@ export default function Dashboard() {
                 <th className="px-6 py-3 font-medium">Status</th>
                 <th className="px-6 py-3 font-medium">Sent</th>
                 <th className="px-6 py-3 font-medium">Date</th>
+                <th className="px-6 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {data.history.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-zinc-500 italic">
+                  <td colSpan={5} className="px-6 py-12 text-center text-zinc-500 italic">
                     No recent activity yet. Start your first campaign!
                   </td>
                 </tr>
@@ -95,7 +110,7 @@ export default function Dashboard() {
                   <tr key={campaign.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                     <td className="px-6 py-4 font-medium">{campaign.name}</td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium 
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
                         ${campaign.status === 'Completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}
                         ${campaign.status === 'Failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ''}
                         ${campaign.status === 'Running' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : ''}
@@ -106,6 +121,16 @@ export default function Dashboard() {
                     </td>
                     <td className="px-6 py-4">{campaign.sent} / {campaign.total}</td>
                     <td className="px-6 py-4 text-zinc-500">{campaign.date}</td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => handleDelete(campaign.id, campaign.name)}
+                        title="Delete campaign"
+                        aria-label={`Delete campaign ${campaign.name}`}
+                        className="inline-flex items-center justify-center p-2 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
