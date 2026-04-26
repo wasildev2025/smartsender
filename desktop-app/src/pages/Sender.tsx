@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Square, Settings, Users, Upload, Tag, Trash2, MessageCircle, Lock } from 'lucide-react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 

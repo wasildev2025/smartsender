@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, LogOut, CheckCircle2, ShieldAlert, Key, Clock, ShieldX, MessageCircleOff } from 'lucide-react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 
 export default function Settings() {
   const { isLicensed, expiresAt, verifyLicense, logoutLicense } = useLicense();

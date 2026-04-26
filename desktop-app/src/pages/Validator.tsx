@@ -29,7 +29,7 @@ export default function Validator() {
       try {
         const res = await window.smartsender.wa.checkNumber(number);
         setResults(prev => [...prev, { number, isWhatsApp: res.isRegistered }]);
-      } catch (err) {
+      } catch {
         setResults(prev => [...prev, { number, isWhatsApp: false }]);
       }
       setProgress(i + 1);

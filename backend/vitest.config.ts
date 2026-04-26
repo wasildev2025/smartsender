@@ -1,12 +1,21 @@
 import { defineConfig } from 'vitest/config'
-import tsconfigPaths from 'vite-tsconfig-paths'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 
 // Backend tests run in plain node, no JSDOM. We don't have any tests that
 // require Next.js routing — the unit suites target lib/ helpers directly.
-// Integration tests against a real Supabase would need a separate config
-// with env-backed credentials; that's a follow-up.
+//
+// We resolve the `@/*` path alias manually rather than via vite-tsconfig-paths
+// because that plugin is ESM-only and backend's vitest.config.ts is loaded
+// as CJS (no "type": "module" in package.json).
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, Users, MessageSquare, AlertCircle, RefreshCw, Lock } from 'lucide-react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 import { Link } from 'react-router-dom';
 
 export default function Extractor() {
@@ -14,6 +14,20 @@ export default function Extractor() {
 
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [extracting, setExtracting] = useState(false);
+
+  const fetchChats = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await window.smartsender.wa.getChats();
+      setChats(data || []);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load chats. Make sure WhatsApp is connected.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,20 +60,7 @@ export default function Extractor() {
       cancelled = true;
       unsubscribe();
     };
-  }, []);
-
-  const fetchChats = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await window.smartsender.wa.getChats();
-      setChats(data || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load chats. Make sure WhatsApp is connected.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchChats]);
 
   const exportCSV = (filename: string, rows: string[][]) => {
     // Escape embedded quotes and wrap any cell that has a comma, quote, or

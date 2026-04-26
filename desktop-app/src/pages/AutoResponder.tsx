@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bot, Plus, Trash2, Save, CheckCircle2, Lock } from 'lucide-react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 import { Link } from 'react-router-dom';
 
 interface Rule {

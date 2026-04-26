@@ -72,8 +72,8 @@ export default function LicenseTable({ initialLicenses }: { initialLicenses: Lic
                     <span className="text-xs font-mono text-zinc-500" title={license.machine_id}>
                       {license.machine_id.substring(0, 12)}...
                     </span>
-                    <form action={async (formData) => {
-                      if(confirm('Reset Machine ID for this license?')) {
+                    <form action={async () => {
+                      if (confirm('Reset Machine ID for this license?')) {
                         await resetMachineIdAction(license.id)
                       }
                     }}>

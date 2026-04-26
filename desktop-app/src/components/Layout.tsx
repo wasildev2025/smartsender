@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

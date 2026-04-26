@@ -1,15 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-
-interface LicenseContextType {
-  isLicensed: boolean;
-  expiresAt: string | null;
-  features: string[];
-  isLoading: boolean;
-  verifyLicense: (key?: string) => Promise<boolean>;
-  logoutLicense: () => Promise<void>;
-}
-
-const LicenseContext = createContext<LicenseContextType | undefined>(undefined);
+import React, { useState, useEffect, useCallback } from 'react';
+import { LicenseContext, type LicenseUpdatePayload } from './licenseShared';
 
 export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLicensed, setIsLicensed] = useState(false);
@@ -51,12 +41,13 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   useEffect(() => {
+    // One-shot bootstrap on mount; subsequently rely on push events from
+    // main (license-updated). The set-state-in-effect lint warning is the
+    // accepted trade-off for "load on mount" patterns until we move to
+    // useSyncExternalStore.
     refreshFromMain();
 
-    // The main process owns sync cadence (hourly, plus once at boot). The
-    // renderer just listens for license-updated pushes, which fire whenever
-    // status flips — no separate polling interval needed.
-    const unsub = window.smartsender.license.onUpdate((status: any) => {
+    const unsub = window.smartsender.license.onUpdate((status: LicenseUpdatePayload) => {
       setIsLicensed(status.valid);
       setExpiresAt(status.expiresAt);
       setFeatures(status.features);
@@ -70,12 +61,4 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       {children}
     </LicenseContext.Provider>
   );
-};
-
-export const useLicense = () => {
-  const context = useContext(LicenseContext);
-  if (context === undefined) {
-    throw new Error('useLicense must be used within a LicenseProvider');
-  }
-  return context;
 };

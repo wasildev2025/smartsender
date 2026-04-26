@@ -8,7 +8,7 @@ type Row = Record<string, any>
 
 class FakeQuery {
   private filters: Array<(r: Row) => boolean> = []
-  private order: { col: string; asc: boolean } | null = null
+  private orderBy: { col: string; asc: boolean } | null = null
   private limitN: number | null = null
   private headOnly = false
   private wantSelect = false
@@ -39,7 +39,7 @@ class FakeQuery {
     return this
   }
   order(col: string, opts?: { ascending: boolean }) {
-    this.order = { col, asc: opts?.ascending ?? true }
+    this.orderBy = { col, asc: opts?.ascending ?? true }
     return this
   }
   limit(n: number) {
@@ -70,7 +70,6 @@ class FakeQuery {
   }
 
   // The chain is awaited directly when we want bulk results / count / write.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   then(onFulfilled: (v: any) => any, onRejected?: (e: any) => any) {
     return this.execute().then(onFulfilled, onRejected)
   }
@@ -112,8 +111,8 @@ class FakeQuery {
   private applyFilters(): Row[] {
     let rows = this.store.tables[this.table].slice()
     for (const f of this.filters) rows = rows.filter(f)
-    if (this.order) {
-      const { col, asc } = this.order
+    if (this.orderBy) {
+      const { col, asc } = this.orderBy
       rows.sort((a, b) => (a[col] < b[col] ? -1 : a[col] > b[col] ? 1 : 0) * (asc ? 1 : -1))
     }
     if (this.limitN != null) rows = rows.slice(0, this.limitN)

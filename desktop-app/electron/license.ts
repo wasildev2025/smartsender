@@ -3,6 +3,10 @@ import { importSPKI, jwtVerify } from 'jose'
 import { createHash } from 'node:crypto'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
+
+// Bridge for CommonJS-only deps used inside this ESM module.
+const requireCJS = createRequire(import.meta.url)
 
 // -----------------------------------------------------------------
 // License enforcement — main-process only.
@@ -144,12 +148,19 @@ function decryptToken(record: PersistedLicense): string | null {
   return null
 }
 
+type MachineIdModule = {
+  machineIdSync?: () => string
+  default?: { machineIdSync?: () => string }
+}
+
 export function computeHwid(): string {
   // Combine a machine identifier with the userData path so cloning the
   // folder to another machine does not silently re-use the license.
   try {
-    const mod = require('node-machine-id')
-    const mid = (mod.machineIdSync ?? mod.default?.machineIdSync)() as string
+    const mod = requireCJS('node-machine-id') as MachineIdModule
+    const sync = mod.machineIdSync ?? mod.default?.machineIdSync
+    const mid = sync ? sync() : ''
+    if (!mid) throw new Error('machineIdSync unavailable')
     return createHash('sha256').update(`${mid}|${app.getPath('userData')}`).digest('hex').slice(0, 48)
   } catch {
     return createHash('sha256').update(app.getPath('userData')).digest('hex').slice(0, 48)

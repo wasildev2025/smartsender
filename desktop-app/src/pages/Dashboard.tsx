@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 import { ShieldCheck, ShieldAlert, Trash2 } from 'lucide-react';
 
 interface CampaignRecord {

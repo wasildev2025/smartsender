@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Users, Play, Square, MessageSquare, AlertTriangle, Lock } from 'lucide-react';
-import { useLicense } from '../context/LicenseContext';
+import { useLicense } from '../context/licenseShared';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 
