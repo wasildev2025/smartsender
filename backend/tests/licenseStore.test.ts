@@ -59,23 +59,29 @@ class FakeQuery {
     return this
   }
 
-  async maybeSingle() {
-    const matches = this.applyFilters()
-    if (matches.length === 0) return { data: null, error: null }
-    return { data: matches[0], error: null }
-  }
+  // Every terminal — single(), maybeSingle(), or implicit await via then() —
+  // routes through execute() so writes happen exactly once per chain.
   async single() {
-    const matches = this.applyFilters()
-    return { data: matches[0] ?? null, error: matches[0] ? null : { message: 'no rows' } }
+    const r = await this.execute()
+    if (r.error) return { data: null, error: r.error }
+    const arr = Array.isArray(r.data) ? r.data : (r.data == null ? [] : [r.data])
+    if (arr.length === 0) return { data: null, error: { message: 'no rows' } }
+    return { data: arr[0], error: null }
+  }
+  async maybeSingle() {
+    const r = await this.execute()
+    if (r.error) return { data: null, error: r.error }
+    const arr = Array.isArray(r.data) ? r.data : (r.data == null ? [] : [r.data])
+    return { data: arr[0] ?? null, error: null }
   }
 
-  // The chain is awaited directly when we want bulk results / count / write.
+  // Awaiting the chain directly (no .single() / .maybeSingle()) — used for
+  // updates and bulk reads in licenseStore.
   then(onFulfilled: (v: any) => any, onRejected?: (e: any) => any) {
     return this.execute().then(onFulfilled, onRejected)
   }
 
-  private async execute() {
-    const matches = this.applyFilters()
+  private async execute(): Promise<{ data: any; error: any; count?: number }> {
     if (this.insertRows) {
       const inserted: Row[] = []
       for (const r of this.insertRows) {
@@ -92,11 +98,17 @@ class FakeQuery {
         this.store.tables[this.table].push(row)
         inserted.push(row)
       }
-      return { data: this.wantSelect ? inserted[0] : null, error: null }
+      // .select().single() after .insert() should return the first inserted
+      // row. Without .select(), supabase returns null in data.
+      return { data: this.wantSelect ? inserted : null, error: null }
     }
+    const matches = this.applyFilters()
     if (this.updatePatch) {
       for (const r of matches) Object.assign(r, this.updatePatch)
-      return { data: matches, error: null }
+      // .select() after .update() should return the affected rows; without
+      // .select() supabase returns the matches anyway, but we mirror the
+      // wantSelect flag for parity.
+      return { data: this.wantSelect ? matches : matches, error: null }
     }
     if (this.deleteRows) {
       this.store.tables[this.table] = this.store.tables[this.table].filter(

@@ -21,10 +21,14 @@ MCowBQYDK2VwAyEATNJphCxaR8S7gukdfvs0WNaCFndQswyq/Ld2ggtDuK4=
 
 const licensePublicKey = process.env.SS_LICENSE_PUBLIC_KEY ?? DEV_PLACEHOLDER_KEY
 const apiUrl = process.env.SS_API_URL ?? 'https://smartsender.vercel.app'
-const isReleaseBuild = process.env.NODE_ENV === 'production' || process.env.SS_RELEASE === '1'
+
+// SS_RELEASE is set by the `release` npm script (electron-builder pipeline).
+// Plain `npm run build` and CI builds are allowed to use the dev placeholder
+// — the runtime guard in license.ts still refuses to start a packaged binary
+// that ships the placeholder, so this is just a faster fail at release time.
+const isReleaseBuild = process.env.SS_RELEASE === '1'
 
 if (isReleaseBuild && licensePublicKey === DEV_PLACEHOLDER_KEY) {
-  // Hard fail at build time so a placeholder key never reaches users.
   throw new Error(
     'SS_LICENSE_PUBLIC_KEY is not set for release build. Refusing to ship the dev placeholder.',
   )

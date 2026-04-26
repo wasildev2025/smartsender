@@ -72,16 +72,24 @@ describe('SendGovernor', () => {
 
   it('resets the daily counter when the UTC day rolls over', async () => {
     vi.useFakeTimers()
-    vi.setSystemTime(new Date('2025-06-15T23:59:00Z'))
+    // Start mid-day so the burn loop can advance time without crossing UTC
+    // midnight on its own — we want the rollover to happen as a single
+    // explicit setSystemTime jump.
+    vi.setSystemTime(new Date('2025-06-15T12:00:00Z'))
     const { SendGovernor } = await import('../rateLimiter')
     const g = new SendGovernor()
 
-    // Burn through the daily cap on day 1.
-    for (let i = 0; i < 50; i++) {
+    // Burn through the day-0 cap (~20). 25 iterations is plenty; each
+    // advance of 60s refills the minute bucket but stays well within the day.
+    let lastReason: string | undefined
+    for (let i = 0; i < 25; i++) {
       vi.advanceTimersByTime(60_000)
-      await g.request('acct-rollover')
+      const d = await g.request('acct-rollover')
+      if (!d.allow) lastReason = d.reason
     }
-    // Cross midnight UTC.
+    expect(lastReason).toBe('daily_cap')
+
+    // Now explicitly cross UTC midnight and confirm the next request is allowed.
     vi.setSystemTime(new Date('2025-06-16T00:01:00Z'))
     const post = await g.request('acct-rollover')
     expect(post.allow).toBe(true)
