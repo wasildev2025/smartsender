@@ -2,8 +2,10 @@
 
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { revokeAllDevices, revokeDevice } from '@/lib/licenseStore'
+import { rateLimit } from '@/lib/rateLimit'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
 // -----------------------------------------------------------------
 // EVERY mutating action below MUST call assertAdmin() first.
@@ -21,19 +23,39 @@ async function assertAdmin() {
   return user
 }
 
-export async function login(formData: FormData) {
-  const supabase = await createClient()
+async function getClientIp(): Promise<string> {
+  const h = await headers()
+  const fwd = h.get('x-forwarded-for')
+  if (fwd) return fwd.split(',')[0]!.trim()
+  return h.get('x-real-ip') ?? 'unknown'
+}
 
-  const email = String(formData.get('email') ?? '').trim()
+export async function login(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase()
   const password = String(formData.get('password') ?? '')
   if (!email || !password) {
     redirect('/admin/login?error=' + encodeURIComponent('Email and password are required'))
   }
 
+  // Two-tier rate limit:
+  //   * per-IP: 10 attempts per 5 minutes — slows distributed brute-force
+  //   * per-email: 5 attempts per 5 minutes — slows targeted credential
+  //     stuffing even when the attacker rotates IPs
+  // In-memory map: each warm Next.js instance enforces independently. For
+  // multi-instance production swap rateLimit storage for Vercel KV / Upstash.
+  const ip = await getClientIp()
+  const ipLimit = rateLimit(`admin-login-ip:${ip}`, 10, 10 / (5 * 60))
+  const emailLimit = rateLimit(`admin-login-email:${email}`, 5, 5 / (5 * 60))
+  if (!ipLimit.ok || !emailLimit.ok) {
+    redirect('/admin/login?error=' + encodeURIComponent('Too many attempts. Try again in a few minutes.'))
+  }
+
+  const supabase = await createClient()
   const { error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    redirect('/admin/login?error=' + encodeURIComponent(error.message))
+    // Generic message — never reveal whether the email exists.
+    redirect('/admin/login?error=' + encodeURIComponent('Invalid email or password.'))
   }
 
   revalidatePath('/admin', 'layout')

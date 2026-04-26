@@ -17,9 +17,17 @@ interface CampaignRecord {
   date: string;
 }
 
+export interface AutoResponderRule {
+  id?: string;
+  keyword: string;
+  matchType: 'exact' | 'contains';
+  replyText: string;
+}
+
 interface AppData {
   totalSent: number;
   history: CampaignRecord[];
+  autoResponderRules?: AutoResponderRule[];
 }
 
 const ENC_MAGIC = 'SSENC1:';  // prefix to signal an encrypted payload on disk.
@@ -116,5 +124,17 @@ export class StorageService {
     }
     await this.save();
     return { success: true };
+  }
+
+  public async getAutoResponderRules(): Promise<AutoResponderRule[]> {
+    await this.ensureInitialized();
+    return this.data?.autoResponderRules ?? [];
+  }
+
+  public async setAutoResponderRules(rules: AutoResponderRule[]) {
+    await this.ensureInitialized();
+    if (!this.data) return;
+    this.data.autoResponderRules = rules;
+    await this.save();
   }
 }

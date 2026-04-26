@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bot, Plus, Trash2, Save, CheckCircle2, Lock } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
 import { Link } from 'react-router-dom';
@@ -14,6 +14,25 @@ export default function AutoResponder() {
   const { isLicensed } = useLicense();
   const [rules, setRules] = useState<Rule[]>([]);
   const [saved, setSaved] = useState(false);
+
+  // Load persisted rules on mount so the user's saved configuration survives
+  // an app restart. Rules saved before this fix appeared to "vanish" because
+  // the main process kept them in memory only.
+  useEffect(() => {
+    let cancelled = false;
+    window.smartsender.wa.getAutoResponder().then(saved => {
+      if (cancelled) return;
+      setRules(
+        (saved ?? []).map(r => ({
+          id: r.id ?? crypto.randomUUID(),
+          keyword: r.keyword,
+          matchType: r.matchType,
+          replyText: r.replyText,
+        }))
+      );
+    }).catch(err => console.error('Failed to load auto-responder rules', err));
+    return () => { cancelled = true; };
+  }, []);
 
   const addRule = () => {
     setRules([

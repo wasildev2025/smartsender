@@ -39,6 +39,7 @@ const api = {
     leaveGroup:           (groupId: string)                                                 => ipcRenderer.invoke('wa-leave-group', groupId),
     checkNumber:          (number: string)                                                  => ipcRenderer.invoke('wa-check-number', number),
     setAutoResponder:     (rules: unknown[])                                                => ipcRenderer.invoke('wa-set-auto-responder', rules),
+    getAutoResponder:     ()                                                                => ipcRenderer.invoke('wa-get-auto-responder'),
     logout:               ()                                                                => ipcRenderer.invoke('wa-logout'),
     onStatus:             (cb: (s: WaStatus) => void): Unsubscribe                          => on<WaStatus>('wa-status', cb),
   },

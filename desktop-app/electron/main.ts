@@ -27,13 +27,30 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? join(process.env.APP_ROOT, 'publ
 declare const __SS_API_URL__: string
 const API_ORIGIN = process.env.SS_API_URL ?? __SS_API_URL__
 
+// CSP for the renderer.
+//
+// In dev, Vite's HMR runtime needs 'unsafe-eval' to evaluate hot updates;
+// production builds emit static JS and don't need it. Keep the loose policy
+// scoped to dev so the packaged app gets a meaningfully tighter CSP.
+//
+// 'unsafe-inline' for scripts is unfortunately still required by some React
+// dev runtime injections; tightening that further (nonces) is a follow-up.
+//
+// connect-src deliberately does not whitelist Supabase: the renderer does not
+// talk to Supabase — only the main process does, via Node fetch (CSP doesn't
+// apply there). Anything reaching Supabase from the renderer would be a bug.
+const isDev = !!VITE_DEV_SERVER_URL
+const scriptSrc = isDev
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'"
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  `connect-src 'self' ${API_ORIGIN} https://vdrbvlabtlhktwusaxfg.supabase.co wss://*.supabase.co`,
+  `connect-src 'self' ${API_ORIGIN}`,
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -112,11 +129,17 @@ function createWindow() {
 }
 
 function initServices() {
+  if (!storage) storage = new StorageService()
   if (!waService && win) {
     waService = new WhatsAppService(win)
     waService.initialize()
+    // Restore persisted auto-responder rules so the rules a user saved before
+    // restart actually fire after restart. Best-effort — failures are logged
+    // but don't block the WA client from starting.
+    storage!.getAutoResponderRules()
+      .then(rules => waService!.setAutoResponderRules(rules))
+      .catch(err => console.error('Failed to load auto-responder rules', err))
   }
-  if (!storage) storage = new StorageService()
 }
 
 type Handler<S extends ZodType> = (args: z.infer<S>) => unknown | Promise<unknown>
@@ -192,10 +215,16 @@ function registerIpc() {
     ([number]) => waService!.checkNumber(number),
     { feature: 'wa_validate' })
 
-  safeHandle('wa-set-auto-responder', Schemas.AutoResponderRules, ([rules]) => {
+  safeHandle('wa-set-auto-responder', Schemas.AutoResponderRules, async ([rules]) => {
     waService?.setAutoResponderRules(rules)
+    // Persist alongside the in-memory copy so they survive restarts.
+    await storage?.setAutoResponderRules(rules as any)
     return { success: true }
   }, { feature: 'wa_auto_responder' })
+
+  ipcMain.handle('wa-get-auto-responder', async () => {
+    return (await storage?.getAutoResponderRules()) ?? []
+  })
 
   // ------- License -------
   safeHandle('license-activate', Schemas.LicenseKey, async ([key]) => {

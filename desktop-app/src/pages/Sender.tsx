@@ -193,7 +193,7 @@ export default function Sender() {
 
       // Record campaign with the correct status based on actual outcomes.
       await window.smartsender.db.recordCampaign({
-        id: Math.random().toString(36).substring(7),
+        id: crypto.randomUUID(),
         name: campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`,
         status: allFailed ? 'Failed' : 'Completed',
         sent: sentCount,
@@ -211,7 +211,7 @@ export default function Sender() {
     // Record partial progress to database if we had any progress
     if (progress > 0) {
       await window.smartsender.db.recordCampaign({
-        id: Math.random().toString(36).substring(7),
+        id: crypto.randomUUID(),
         name: (campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`) + ' (Stopped)',
         status: 'Failed',
         sent: progress,

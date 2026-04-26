@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, LogOut, CheckCircle2, ShieldAlert, Key, Clock, ShieldX, MessageCircleOff } from 'lucide-react';
 import { useLicense } from '../context/LicenseContext';
 
@@ -8,6 +8,17 @@ export default function Settings() {
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [hwid, setHwid] = useState<string>('');
+
+  useEffect(() => {
+    if (!isLicensed) return;
+    let cancelled = false;
+    window.smartsender.system.getMachineId().then(id => {
+      if (cancelled) return;
+      setHwid(id ? `${id.substring(0, 16)}...` : 'Unknown');
+    });
+    return () => { cancelled = true; };
+  }, [isLicensed]);
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +95,7 @@ export default function Settings() {
                       </p>
                       <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-mono">
                         <span className="uppercase tracking-widest text-zinc-500 font-bold">Hardware ID:</span>
-                        <span id="hwid-display">Loading...</span>
+                        <span>{hwid || 'Loading...'}</span>
                       </div>
                     </div>
                   </div>
@@ -95,8 +106,8 @@ export default function Settings() {
                         <Clock size={14} /> {getTimeLeft()}
                       </p>
                     </div>
-                    <button 
-                      onClick={() => verifyLicense()} 
+                    <button
+                      onClick={() => verifyLicense()}
                       className="text-[10px] bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 px-2 py-1 rounded font-bold uppercase tracking-widest transition-colors flex items-center gap-1"
                       title="Force sync with server"
                     >
@@ -104,12 +115,6 @@ export default function Settings() {
                     </button>
                   </div>
                 </div>
-                <script dangerouslySetInnerHTML={{ __html: `
-                  window.smartsender.getMachineId().then(id => {
-                    const el = document.getElementById('hwid-display');
-                    if (el) el.innerText = id ? id.substring(0, 16) + '...' : 'Unknown';
-                  })
-                `}} />
               </div>
             ) : (
               <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl">

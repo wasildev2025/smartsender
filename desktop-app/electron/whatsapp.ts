@@ -38,6 +38,9 @@ export class WhatsAppService {
   private readonly governor = new SendGovernor();
   private initWatchdog: ReturnType<typeof setTimeout> | null = null;
   private initAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
+  private userInitiatedLogout = false;
 
   constructor(win: BrowserWindow, accountId: string = 'default') {
     this.win = win;
@@ -66,15 +69,10 @@ export class WhatsAppService {
         // Give puppeteer more time to launch on slower machines.
         timeout: 120_000,
       },
-      // Pin a remote-cached WhatsApp Web version. Reduces variability in
-      // startup (and the occasional "stuck loading" caused by WA pushing
-      // breaking client changes that whatsapp-web.js hasn't caught up to).
-      webVersionCache: {
-        type: 'remote',
-        remotePath:
-          'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1023501197.html',
-      },
-      // Larger auth timeout helps on cold starts.
+      // We deliberately do NOT pin webVersionCache — a hardcoded community
+      // mirror URL goes stale or 404s and breaks every user. Trust the
+      // library default; accept that cold starts can take 5-30s. The init
+      // watchdog (initialize()) auto-restarts if WA never reaches READY.
       authTimeoutMs: 60_000,
       qrMaxRetries: 3,
       takeoverOnConflict: true,
@@ -98,6 +96,9 @@ export class WhatsAppService {
       this.currentStatus = 'READY';
       this.currentQR = '';
       this.clearInitWatchdog();
+      // We're back online — reset reconnect backoff so a future disconnect
+      // doesn't inherit a long delay from a previous outage.
+      this.reconnectAttempts = 0;
       this.notifyFrontend('wa-status', {
         status: this.currentStatus,
         number: this.client.info.wid.user,
@@ -122,10 +123,49 @@ export class WhatsAppService {
       this.currentStatus = 'DISCONNECTED';
       this.clearInitWatchdog();
       this.notifyFrontend('wa-status', { status: this.currentStatus, reason });
+      // Schedule an auto-reconnect unless the user explicitly logged out.
+      // WA drops sessions for many reasons (network blip, takeover, phone
+      // offline); without this the user has to restart the app every time.
+      if (!this.userInitiatedLogout) {
+        this.scheduleReconnect();
+      }
     });
   }
 
+  private scheduleReconnect() {
+    if (this.reconnectTimer) return; // already scheduled
+    if (this.reconnectAttempts >= 5) {
+      console.warn('WhatsApp auto-reconnect: giving up after 5 attempts');
+      return;
+    }
+    // Exponential backoff: 5s, 15s, 45s, 2m, 5m
+    const delays = [5_000, 15_000, 45_000, 120_000, 300_000];
+    const delay = delays[Math.min(this.reconnectAttempts, delays.length - 1)];
+    this.reconnectAttempts += 1;
+    console.log(`WhatsApp auto-reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.userInitiatedLogout) return;
+      this.restart().catch(err => {
+        console.error('Auto-reconnect restart failed', err);
+        this.scheduleReconnect();
+      });
+    }, delay);
+  }
+
+  private cancelReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempts = 0;
+  }
+
   public async initialize() {
+    // Reaching initialize() means we're attempting to connect — the user has
+    // not requested a logout, and any pending reconnect timer is superseded.
+    this.userInitiatedLogout = false;
+    this.cancelReconnect();
     this.initAttempts += 1;
     console.log(`Initializing WhatsApp Client (attempt ${this.initAttempts})...`);
     this.currentStatus = 'INITIALIZING';
@@ -235,7 +275,15 @@ export class WhatsAppService {
   }
 
   public async logout() {
-    await this.client.logout();
+    // Mark this as user-initiated so the 'disconnected' event handler doesn't
+    // try to auto-reconnect us into the QR screen we just left.
+    this.userInitiatedLogout = true;
+    this.cancelReconnect();
+    try {
+      await this.client.logout();
+    } catch (err) {
+      console.error('logout() failed', err);
+    }
     this.currentStatus = 'DISCONNECTED';
     this.currentQR = '';
     this.notifyFrontend('wa-status', { status: this.currentStatus });

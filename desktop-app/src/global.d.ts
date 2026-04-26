@@ -38,6 +38,7 @@ declare global {
         leaveGroup: (groupId: string) => Promise<{ success: boolean; error?: string }>;
         checkNumber: (number: string) => Promise<{ number: string; isRegistered: boolean; error?: string }>;
         setAutoResponder: (rules: unknown[]) => Promise<{ success: boolean }>;
+        getAutoResponder: () => Promise<Array<{ id?: string; keyword: string; matchType: 'exact' | 'contains'; replyText: string }>>;
         logout: () => Promise<{ success: boolean }>;
         onStatus: (cb: (s: WaStatus) => void) => Unsubscribe;
       };
