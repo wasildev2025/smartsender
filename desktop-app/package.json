@@ -9,11 +9,14 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "release": "cross-env SS_RELEASE=1 NODE_ENV=production npm run build && electron-builder --win -c.npmRebuild=false"
   },
   "dependencies": {
     "bufferutil": "^4.1.0",
     "clsx": "^2.1.1",
+    "electron-log": "^5.2.4",
     "electron-updater": "^6.3.9",
     "jose": "^6.2.2",
     "keytar": "^7.9.0",
@@ -38,6 +41,8 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "vitest": "^2.1.8",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",

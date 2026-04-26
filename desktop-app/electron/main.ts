@@ -7,12 +7,17 @@ import { StorageService } from './storage'
 import { Schemas } from './ipc-schemas'
 import { LicenseManager, guardAgainstPlaceholderKey } from './license'
 import { setupAutoUpdater } from './updater'
+import { initLogger, scoped } from './logger'
+
+const mainLog = scoped('main')
 import { z, type ZodType } from 'zod'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = join(__dirname, '..')
 
+// initLogger() inside app.whenReady will install proper handlers; this stub
+// only exists so we don't lose rejections that happen during module init.
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection at:', reason);
 });
@@ -284,12 +289,14 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(async () => {
+  initLogger()
+
   // Refuse to start a packaged build that ships the dev placeholder key.
   // Better to fail loudly here than to silently reject every license activation.
   try {
     guardAgainstPlaceholderKey()
   } catch (err) {
-    console.error(err)
+    mainLog.error('Aborting launch:', err)
     app.exit(1)
     return
   }

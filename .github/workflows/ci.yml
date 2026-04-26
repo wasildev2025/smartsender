@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref so a fast-typing developer doesn't
+# clog the queue with stale builds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      # Stub env vars so `next build` doesn't fail at import time on the
+      # real-key check in licenseSigning.ts. CI builds verify compilation,
+      # not deployability.
+      - name: Build (with stub envs)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: stub
+          SUPABASE_SERVICE_ROLE_KEY: stub
+          SS_LICENSE_PRIVATE_KEY: |
+            -----BEGIN PRIVATE KEY-----
+            MC4CAQAwBQYDK2VwBCIEIBhTrwt1c0jpc6dC4Q7tjNZdQk4gxv1Lf6dSzZ7PqlLB
+            -----END PRIVATE KEY-----
+          SS_LICENSE_PUBLIC_KEY: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEATNJphCxaR8S7gukdfvs0WNaCFndQswyq/Ld2ggtDuK4=
+            -----END PUBLIC KEY-----
+
+  desktop:
+    name: desktop / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: desktop-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop-app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      # Build the renderer + main bundles. We do NOT run electron-builder in
+      # CI by default — it's slow, cross-platform, and only needed at release.
+      # The dev placeholder key is fine because we don't set SS_RELEASE here.
+      - run: npm run build
