@@ -390,7 +390,7 @@ export default function Sender() {
               value={contactsRaw}
               onChange={e => setContactsRaw(e.target.value)}
               className="w-full flex-1 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none font-mono text-sm"
-              placeholder="1234567890, John Doe\n9876543210, Jane Smith"
+              placeholder={"1234567890, John Doe\n9876543210, Jane Smith"}
               disabled={isRunning}
             />
           ) : (

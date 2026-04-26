@@ -27,7 +27,7 @@ declare global {
     smartsender: {
       wa: {
         getStatus: () => Promise<WaStatus>;
-        sendMessage: (number: string, text: string, attachmentPath?: string) => Promise<SendResult>;
+        sendMessage: (number: string, text: string) => Promise<SendResult>;
         sendPoll: (number: string, question: string, options: string[], allowMultiple?: boolean) => Promise<SendResult>;
         getChats: () => Promise<Array<{ id: string; name: string; isGroup: boolean; unreadCount: number }>>;
         getGroupMembers: (groupId: string) => Promise<Array<{ id: string; number: string; isAdmin: boolean }>>;

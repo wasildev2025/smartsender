@@ -1,6 +1,3 @@
-import { app } from 'electron'
-import { realpathSync } from 'node:fs'
-import path from 'node:path'
 import { z } from 'zod'
 
 // -----------------------------------------------------------------
@@ -33,32 +30,10 @@ const InviteCode = z.string()
   .transform(s => s.replace(/^https?:\/\/chat\.whatsapp\.com\//i, '').trim())
   .refine(s => /^[A-Za-z0-9_-]{10,32}$/.test(s), { message: 'invalid invite code' })
 
-function attachmentsDir() {
-  return path.join(app.getPath('userData'), 'attachments')
-}
-
-function isInsideSandbox(p: string): boolean {
-  try {
-    const base = realpathSync(attachmentsDir())
-    const real = realpathSync(p)
-    const rel = path.relative(base, real)
-    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel)
-  } catch {
-    return false
-  }
-}
-
-const AttachmentPath = z.string()
-  .max(4096)
-  .refine(isInsideSandbox, {
-    message: `attachment must live under ${attachmentsDir()}`,
-  })
-
 export const Schemas = {
   SendMessage: z.tuple([
     PhoneNumber,
     MessageText,
-    AttachmentPath.optional(),
   ]),
 
   SendPoll: z.tuple([
@@ -111,11 +86,3 @@ export const Schemas = {
   ]),
 }
 
-export function ensureAttachmentDir() {
-  const dir = attachmentsDir()
-  try {
-    const fs = require('node:fs') as typeof import('node:fs')
-    fs.mkdirSync(dir, { recursive: true })
-  } catch { /* ignore */ }
-  return dir
-}

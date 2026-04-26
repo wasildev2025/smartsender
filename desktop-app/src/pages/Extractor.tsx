@@ -62,16 +62,25 @@ export default function Extractor() {
   };
 
   const exportCSV = (filename: string, rows: string[][]) => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + rows.map(e => e.join(",")).join("\\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
+    // Escape embedded quotes and wrap any cell that has a comma, quote, or
+    // newline. Without this, names with "," or " produce a malformed CSV.
+    const escape = (cell: string) => {
+      const s = String(cell ?? '');
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const csv = rows.map(r => r.map(escape).join(',')).join('\r\n');
+    // Use a Blob URL — `data:` URIs silently truncate at OS-dependent sizes
+    // and are not reliable for thousands of rows.
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleExtractGroupMembers = async () => {
@@ -123,10 +132,10 @@ export default function Extractor() {
 
     chats.forEach(c => {
       rows.push([
-        `"${c.name}"`, // Quote to handle commas in names
+        c.name,                              // exportCSV() handles quoting
         c.isGroup ? 'Yes' : 'No',
         c.unreadCount.toString(),
-        c.id
+        c.id,
       ]);
     });
 

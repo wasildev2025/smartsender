@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 import { WhatsAppService } from './whatsapp'
 import { StorageService } from './storage'
-import { Schemas, ensureAttachmentDir } from './ipc-schemas'
+import { Schemas } from './ipc-schemas'
 import { LicenseManager, guardAgainstPlaceholderKey } from './license'
+import { setupAutoUpdater } from './updater'
 import { z, type ZodType } from 'zod'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -170,18 +171,34 @@ function safeHandle<S extends ZodType>(channel: string, schema: S, fn: Handler<S
   })
 }
 
+/**
+ * Wrap a no-args IPC handler in the same try/catch envelope as safeHandle, so
+ * a thrown error reaches the renderer as `{ success: false, error }` rather
+ * than rejecting the renderer-side `await` with an opaque IPC failure.
+ */
+function safeHandleVoid(channel: string, fn: () => unknown | Promise<unknown>) {
+  ipcMain.handle(channel, async () => {
+    try {
+      return await fn()
+    } catch (err: any) {
+      console.error(`[ipc] ${channel} failed:`, err)
+      return { success: false, error: err?.message || 'internal_error' }
+    }
+  })
+}
+
 function registerIpc() {
   // ------- WhatsApp handlers (validated) -------
 
-  ipcMain.handle('wa-get-status', () => waService?.getStatus())
-  ipcMain.handle('wa-get-chats', () => waService?.getChats())
-  ipcMain.handle('wa-logout', async () => {
+  safeHandleVoid('wa-get-status', () => waService?.getStatus())
+  safeHandleVoid('wa-get-chats', () => waService!.getChats())
+  safeHandleVoid('wa-logout', async () => {
     await waService?.logout()
     return { success: true }
   })
 
   safeHandle('wa-send-message', Schemas.SendMessage,
-    ([number, text, attachmentPath]) => waService!.sendMessage(number, text, attachmentPath),
+    ([number, text]) => waService!.sendMessage(number, text),
     { feature: 'wa_send' })
 
   safeHandle('wa-send-poll', Schemas.SendPoll,
@@ -222,7 +239,7 @@ function registerIpc() {
     return { success: true }
   }, { feature: 'wa_auto_responder' })
 
-  ipcMain.handle('wa-get-auto-responder', async () => {
+  safeHandleVoid('wa-get-auto-responder', async () => {
     return (await storage?.getAutoResponderRules()) ?? []
   })
 
@@ -230,11 +247,11 @@ function registerIpc() {
   safeHandle('license-activate', Schemas.LicenseKey, async ([key]) => {
     return licenseManager.activate(key)
   })
-  ipcMain.handle('license-status', () => licenseManager.status())
-  ipcMain.handle('license-deactivate', () => licenseManager.deactivate())
+  safeHandleVoid('license-status', () => licenseManager.status())
+  safeHandleVoid('license-deactivate', () => licenseManager.deactivate())
 
   // ------- System -------
-  ipcMain.handle('get-machine-id', async () => {
+  safeHandleVoid('get-machine-id', async () => {
     try {
       const mod: any = await import('node-machine-id')
       return mod.machineIdSync ? mod.machineIdSync() : mod.default?.machineIdSync?.()
@@ -244,7 +261,7 @@ function registerIpc() {
   })
 
   // ------- Local storage -------
-  ipcMain.handle('db-get-dashboard-data', () => storage?.getDashboardData())
+  safeHandleVoid('db-get-dashboard-data', () => storage?.getDashboardData())
   safeHandle('db-record-campaign', Schemas.Campaign,
     ([campaign]) => storage?.recordCampaign(campaign as any))
   safeHandle('db-increment-sent', Schemas.IncrementSent,
@@ -277,12 +294,12 @@ app.whenReady().then(async () => {
     return
   }
 
-  ensureAttachmentDir()
   installSecurityHeaders()
   await licenseManager.load() // restore from disk before IPC is live
   createWindow()
   initServices()
   registerIpc()
+  setupAutoUpdater(win)
 
   // Periodically sync license in the background (every hour)
   setInterval(async () => {

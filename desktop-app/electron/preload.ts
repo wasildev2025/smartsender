@@ -28,7 +28,7 @@ const on = <T>(channel: string, cb: (payload: T) => void): Unsubscribe => {
 const api = {
   wa: {
     getStatus:            ()                                                                => ipcRenderer.invoke('wa-get-status'),
-    sendMessage:          (number: string, text: string, attachmentPath?: string)          => ipcRenderer.invoke('wa-send-message', number, text, attachmentPath),
+    sendMessage:          (number: string, text: string)                                   => ipcRenderer.invoke('wa-send-message', number, text),
     sendPoll:             (number: string, question: string, options: string[], allowMultiple?: boolean) => ipcRenderer.invoke('wa-send-poll', number, question, options, allowMultiple ?? false),
     getChats:             ()                                                                => ipcRenderer.invoke('wa-get-chats'),
     getGroupMembers:      (groupId: string)                                                 => ipcRenderer.invoke('wa-get-group-members', groupId),

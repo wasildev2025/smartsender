@@ -52,21 +52,17 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     refreshFromMain();
-    
-    // Listen for real-time updates from main process (e.g. background sync revocation)
+
+    // The main process owns sync cadence (hourly, plus once at boot). The
+    // renderer just listens for license-updated pushes, which fire whenever
+    // status flips — no separate polling interval needed.
     const unsub = window.smartsender.license.onUpdate((status: any) => {
       setIsLicensed(status.valid);
       setExpiresAt(status.expiresAt);
       setFeatures(status.features);
     });
 
-    // Re-check every 15 minutes as a fallback
-    const interval = setInterval(refreshFromMain, 15 * 60 * 1000);
-    
-    return () => {
-      unsub();
-      clearInterval(interval);
-    };
+    return unsub;
   }, [refreshFromMain]);
 
   return (

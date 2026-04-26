@@ -2,15 +2,9 @@ import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, Poll } = pkg;
 import qrcode from 'qrcode';
 import { app, BrowserWindow } from 'electron';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { SendGovernor } from './rateLimiter';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const require = createRequire(import.meta.url);
 
 // Puppeteer's internal sandbox requires setuid on Linux; on Windows/macOS
 // we rely on Chromium's full sandbox (default: ON).
@@ -232,7 +226,7 @@ export class WhatsAppService {
     };
   }
 
-  public async sendMessage(number: string, text: string, attachmentPath?: string) {
+  public async sendMessage(number: string, text: string) {
     if (this.currentStatus !== 'READY') {
       // Refuse early if the WA web Store hasn't finished hydrating; sending
       // before READY is what produces the cryptic "getChat of undefined" error.
@@ -255,13 +249,7 @@ export class WhatsAppService {
       // Human-pattern jitter before the actual send.
       await new Promise(r => setTimeout(r, decision.waitMs));
 
-      if (attachmentPath) {
-        const { MessageMedia } = require('whatsapp-web.js');
-        const media = MessageMedia.fromFilePath(attachmentPath);
-        await this.client.sendMessage(chatId, media, { caption: text });
-      } else {
-        await this.client.sendMessage(chatId, text);
-      }
+      await this.client.sendMessage(chatId, text);
       return { success: true, number: formattedNumber, remainingToday: decision.remainingToday };
     } catch (error: any) {
       console.error('Failed to send message:', error);
