@@ -15,10 +15,19 @@ vi.mock('electron', () => ({
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'ss-rl-'))
 })
-afterEach(() => {
-  rmSync(tmpDir, { recursive: true, force: true })
+afterEach(async () => {
   vi.resetModules()
   vi.useRealTimers()
+  // Windows CI may still hold file handles briefly after the test finishes.
+  // Retry rmSync once after a short delay to avoid flaky ENOTEMPTY failures.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      rmSync(tmpDir, { recursive: true, force: true })
+      break
+    } catch {
+      await new Promise(r => setTimeout(r, 200))
+    }
+  }
 })
 
 describe('SendGovernor', () => {
