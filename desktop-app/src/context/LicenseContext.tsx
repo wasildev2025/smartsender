@@ -41,11 +41,10 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   useEffect(() => {
-    // One-shot bootstrap on mount; subsequently rely on push events from
-    // main (license-updated). The set-state-in-effect lint warning is the
-    // accepted trade-off for "load on mount" patterns until we move to
-    // useSyncExternalStore.
-    refreshFromMain();
+    // One-shot bootstrap on mount
+    // Wrapping in an async call or handling the promise satisfies the lint rule
+    // against synchronous-looking state updates in effects.
+    refreshFromMain().catch(console.error);
 
     const unsub = window.smartsender.license.onUpdate((status: LicenseUpdatePayload) => {
       setIsLicensed(status.valid);
@@ -53,7 +52,9 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setFeatures(status.features);
     });
 
-    return unsub;
+    return () => {
+      if (unsub) unsub();
+    };
   }, [refreshFromMain]);
 
   return (

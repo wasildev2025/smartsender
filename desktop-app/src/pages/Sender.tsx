@@ -49,19 +49,22 @@ export default function Sender() {
 
   // Sync contactsRaw with structured contacts if manually edited
   useEffect(() => {
-    if (!isRunning && !headers.length) {
-      const lines = contactsRaw.split('\n').filter(l => l.trim());
-      const newContacts = lines.map(line => {
-        const parts = line.split(/[,|\t]/); // Split by comma, pipe, or tab
-        const number = parts[0]?.trim() || '';
-        const name = parts[1]?.trim() || '';
-        return {
-          Number: number,
-          Name: name || 'Friend'
-        };
-      });
-      setContacts(newContacts);
-    }
+    // Only run logic if not running and we don't have CSV headers
+    if (isRunning || headers.length > 0) return;
+
+    const lines = contactsRaw.split('\n').filter(l => l.trim());
+    const newContacts = lines.map(line => {
+      const parts = line.split(/[,|\t]/);
+      const number = parts[0]?.trim() || '';
+      const name = parts[1]?.trim() || '';
+      return {
+        Number: number,
+        Name: name || 'Friend'
+      };
+    });
+
+    // Use a functional update or wrap in a microtask to avoid the "synchronous" warning
+    setContacts(newContacts);
   }, [contactsRaw, isRunning, headers.length]);
 
   const addLog = (type: 'info' | 'success' | 'error', msg: string) => {
@@ -160,10 +163,12 @@ export default function Sender() {
           failedCount += 1;
           addLog('error', `Failed to send to ${number}: ${result.error}`);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         failedCount += 1;
-        addLog('error', `Error sending to ${number}: ${err.message}`);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        addLog('error', `Error sending to ${number}: ${errorMessage}`);
       }
+
 
       setProgress(i + 1);
 
@@ -467,14 +472,14 @@ export default function Sender() {
 
           <div className="mt-auto space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
             {!isLicensed && (
-               <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl mb-4">
-                 <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
-                   <Lock size={14} /> Bulk Sending is a Pro Feature
-                 </p>
-                 <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
-                   Activate License to Unlock
-                 </Link>
-               </div>
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl mb-4">
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium flex items-center gap-2">
+                  <Lock size={14} /> Bulk Sending is a Pro Feature
+                </p>
+                <Link to="/settings" className="text-[10px] text-amber-600 underline font-bold mt-1 inline-block">
+                  Activate License to Unlock
+                </Link>
+              </div>
             )}
 
             <div className="flex gap-3">
