@@ -1,6 +1,6 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, Poll } = pkg;
-// @ts-expect-error
+// @ts-expect-error — chrome-paths has no type declarations
 import chromePaths from 'chrome-paths';
 import qrcode from 'qrcode';
 import { app, BrowserWindow } from 'electron';
