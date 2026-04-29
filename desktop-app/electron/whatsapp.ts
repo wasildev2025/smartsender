@@ -1,5 +1,7 @@
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth, Poll } = pkg;
+// @ts-ignore
+import chromePaths from 'chrome-paths';
 import qrcode from 'qrcode';
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
@@ -58,7 +60,9 @@ export class WhatsAppService {
         dataPath: this.sessionDir,
       }),
       puppeteer: {
+        executablePath: chromePaths.chrome || chromePaths.chromium,
         headless: true,
+        dumpio: true, // Pipes raw Chromium stdout/stderr into the log file
         args: PUPPETEER_ARGS,
         // Give puppeteer more time to launch on slower machines.
         timeout: 120_000,
@@ -67,6 +71,12 @@ export class WhatsAppService {
       // mirror URL goes stale or 404s and breaks every user. Trust the
       // library default; accept that cold starts can take 5-30s. The init
       // watchdog (initialize()) auto-restarts if WA never reaches READY.
+      //
+      // CRITICAL FOR ELECTRON: We MUST disable the local cache type.
+      // By default, it tries to write to node_modules/.wwebjs_cache. In a
+      // packaged app, node_modules is inside the read-only app.asar archive.
+      // The write fails, which breaks the Injected.js script injection!
+      webVersionCache: { type: 'none' },
       authTimeoutMs: 60_000,
       qrMaxRetries: 3,
       takeoverOnConflict: true,
@@ -275,6 +285,10 @@ export class WhatsAppService {
     this.currentStatus = 'DISCONNECTED';
     this.currentQR = '';
     this.notifyFrontend('wa-status', { status: this.currentStatus });
+
+    // After logging out, we need to restart the engine so it generates
+    // a new QR code for the user to scan a different account.
+    this.restart().catch(err => console.error('Failed to restart after logout', err));
   }
 
   public async getChats() {

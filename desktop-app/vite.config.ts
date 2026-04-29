@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
 
@@ -19,29 +19,32 @@ const DEV_PLACEHOLDER_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEATNJphCxaR8S7gukdfvs0WNaCFndQswyq/Ld2ggtDuK4=
 -----END PUBLIC KEY-----`
 
-const licensePublicKey = process.env.SS_LICENSE_PUBLIC_KEY ?? DEV_PLACEHOLDER_KEY
-const apiUrl = process.env.SS_API_URL ?? 'https://smartsender.vercel.app'
-
-// SS_RELEASE is set by the `release` npm script (electron-builder pipeline).
-// Plain `npm run build` and CI builds are allowed to use the dev placeholder
-// — the runtime guard in license.ts still refuses to start a packaged binary
-// that ships the placeholder, so this is just a faster fail at release time.
-const isReleaseBuild = process.env.SS_RELEASE === '1'
-
-if (isReleaseBuild && licensePublicKey === DEV_PLACEHOLDER_KEY) {
-  throw new Error(
-    'SS_LICENSE_PUBLIC_KEY is not set for release build. Refusing to ship the dev placeholder.',
-  )
-}
-
-const defineForMain = {
-  __SS_LICENSE_PUBLIC_KEY__: JSON.stringify(licensePublicKey),
-  __SS_API_URL__: JSON.stringify(apiUrl),
-  __SS_LICENSE_KEY_IS_PLACEHOLDER__: JSON.stringify(licensePublicKey === DEV_PLACEHOLDER_KEY),
-}
-
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+
+  const licensePublicKey = env.SS_LICENSE_PUBLIC_KEY || process.env.SS_LICENSE_PUBLIC_KEY || DEV_PLACEHOLDER_KEY
+  const apiUrl = env.SS_API_URL || process.env.SS_API_URL || 'https://smartsender.vercel.app'
+
+  // SS_RELEASE is set by the `release` npm script (electron-builder pipeline).
+  // Plain `npm run build` and CI builds are allowed to use the dev placeholder
+  // — the runtime guard in license.ts still refuses to start a packaged binary
+  // that ships the placeholder, so this is just a faster fail at release time.
+  const isReleaseBuild = process.env.SS_RELEASE === '1' || env.SS_RELEASE === '1'
+
+  if (isReleaseBuild && licensePublicKey === DEV_PLACEHOLDER_KEY) {
+    throw new Error(
+      'SS_LICENSE_PUBLIC_KEY is not set for release build. Refusing to ship the dev placeholder.',
+    )
+  }
+
+  const defineForMain = {
+    __SS_LICENSE_PUBLIC_KEY__: JSON.stringify(licensePublicKey),
+    __SS_API_URL__: JSON.stringify(apiUrl),
+    __SS_LICENSE_KEY_IS_PLACEHOLDER__: JSON.stringify(licensePublicKey === DEV_PLACEHOLDER_KEY),
+  }
+
+  return {
   plugins: [
     react(),
     electron({
@@ -51,7 +54,7 @@ export default defineConfig({
           define: defineForMain,
           build: {
             rollupOptions: {
-              external: ['whatsapp-web.js', 'bufferutil', 'utf-8-validate'],
+              external: ['whatsapp-web.js', 'bufferutil', 'utf-8-validate', 'jose', 'chrome-paths'],
             },
           },
         },
@@ -73,4 +76,5 @@ export default defineConfig({
     }),
   ],
   base: './', // important for electron
+  }
 })

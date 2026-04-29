@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "bufferutil": "^4.1.0",
+    "chrome-paths": "^1.0.1",
     "clsx": "^2.1.1",
     "electron-log": "^5.2.4",
     "electron-updater": "^6.3.9",
@@ -23,6 +24,7 @@
     "lucide-react": "^1.8.0",
     "node-machine-id": "^1.1.12",
     "papaparse": "^5.5.3",
+    "puppeteer-core": "^24.42.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
@@ -42,7 +44,6 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^2.1.8",
-    "vitest": "^2.1.8",
     "autoprefixer": "^10.5.0",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
@@ -59,6 +60,7 @@
     "vite": "^6.4.2",
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^2.1.8",
     "wait-on": "^9.0.5"
   },
   "build": {
